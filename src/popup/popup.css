@@ -27,6 +27,7 @@ body {
 .items-center { align-items: center; }
 .justify-between { justify-content: space-between; }
 .gap-2 { gap: 0.5rem; }
+.gap-3 { gap: 0.75rem; }
 .grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
 .text-center { text-align: center; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -44,6 +45,7 @@ body {
 .mb-2 { margin-bottom: 0.5rem; }
 .mt-1 { margin-top: 0.25rem; }
 .mt-2 { margin-top: 0.5rem; }
+.mr-1 { margin-right: 0.25rem; }
 
 /* ---- Borders ---- */
 .border-b { border-bottom: 1px solid; }
@@ -124,7 +126,132 @@ button {
 }
 
 .hover\:text-red-400:hover { color: #f87171; }
+.hover\:text-sky-400:hover { color: #38bdf8; }
 .transition-colors { transition: color 0.15s; }
+
+/* ==================================================================
+   Health Indicator
+   ================================================================== */
+
+.health-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4b5563;
+  flex-shrink: 0;
+}
+
+.health-dot.health-active   { background: #34d399; box-shadow: 0 0 5px rgba(52,211,153,0.6); }
+.health-dot.health-degraded { background: #fbbf24; box-shadow: 0 0 5px rgba(251,191,36,0.6); }
+.health-dot.health-error    { background: #f87171; box-shadow: 0 0 5px rgba(248,113,113,0.6); }
+.health-dot.health-disabled { background: #6b7280; }
+
+.health-text {
+  color: #6b7280;
+}
+.health-text.health-active   { color: #34d399; }
+.health-text.health-degraded { color: #fbbf24; }
+.health-text.health-error    { color: #f87171; }
+.health-text.health-disabled { color: #6b7280; }
+
+/* ==================================================================
+   Policy reason line
+   ================================================================== */
+
+.policy-reason-text {
+  font-size: 9px;
+  color: #4b5563;
+  margin-top: 1px;
+  line-height: 1.2;
+}
+
+/* ==================================================================
+   Module controls grid
+   ================================================================== */
+
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.module-toggle-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.04);
+  transition: background 0.15s, border-color 0.15s;
+  user-select: none;
+}
+
+.module-toggle-item:hover {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.1);
+}
+
+.module-toggle-item input:checked + .module-dot {
+  background: #34d399;
+  box-shadow: 0 0 4px rgba(52,211,153,0.5);
+}
+
+.module-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #374151;
+  flex-shrink: 0;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+.module-label {
+  font-size: 9px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+/* ==================================================================
+   Preset buttons
+   ================================================================== */
+
+.preset-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.preset-btn {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.preset-btn:hover {
+  background: rgba(52,211,153,0.12);
+  color: #34d399;
+  border-color: rgba(52,211,153,0.3);
+}
+
+.preset-btn.active {
+  background: rgba(52,211,153,0.15);
+  color: #34d399;
+  border-color: rgba(52,211,153,0.4);
+}
 
 /* ==================================================================
    IMPROVEMENT 9: Animated Shield Header with Status Glow
@@ -450,4 +577,107 @@ button {
 }
 .domain-remove-btn:hover {
   color: #f87171;
+}
+
+/* ==================================================================
+   Diagnostics Panel
+   ================================================================== */
+
+.diag-container {
+  margin-top: 0.5rem;
+  max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #374151 transparent;
+}
+
+.diag-container::-webkit-scrollbar {
+  width: 4px;
+}
+.diag-container::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 2px;
+}
+
+/* Module counter grid (2 columns) */
+.module-counters {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+}
+
+.module-counter-item {
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.04);
+}
+
+.module-counter-name {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+  margin-bottom: 2px;
+}
+
+.module-counter-stats {
+  display: flex;
+  gap: 6px;
+  font-size: 9px;
+}
+
+.module-counter-ok    { color: #34d399; }
+.module-counter-err   { color: #f87171; }
+.module-counter-skip  { color: #fbbf24; }
+
+/* Incident list */
+.incidents-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.incident-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: rgba(248,113,113,0.04);
+  border-left: 2px solid rgba(248,113,113,0.25);
+  font-size: 9px;
+}
+
+.incident-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.incident-module {
+  color: #fbbf24;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.incident-domain {
+  color: #6b7280;
+}
+
+.incident-count {
+  margin-left: auto;
+  color: #f87171;
+}
+
+.incident-message {
+  color: #9ca3af;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.incident-time {
+  color: #4b5563;
 }

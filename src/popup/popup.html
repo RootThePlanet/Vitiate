@@ -7,7 +7,8 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body class="w-[360px] bg-gray-950 text-gray-100 font-sans">
-    <!-- Header with animated shield -->
+
+    <!-- Header with animated shield + health indicator -->
     <header class="header-glow flex items-center justify-between px-4 py-3 border-b border-gray-800" id="header">
       <div class="flex items-center gap-2">
         <div class="shield-container" id="shield-icon">
@@ -18,7 +19,10 @@
           </svg>
         </div>
         <span class="text-lg font-bold tracking-tight text-emerald-400">Vitiate</span>
-        <span class="text-[10px] text-gray-500 uppercase tracking-widest">v1.1</span>
+        <span class="text-[10px] text-gray-500 uppercase tracking-widest">v1.2</span>
+        <!-- Health indicator -->
+        <span class="health-dot" id="health-dot" title="Engine health"></span>
+        <span class="text-[10px] health-text" id="health-text">—</span>
       </div>
       <label class="relative inline-flex items-center cursor-pointer" id="global-toggle-label">
         <input type="checkbox" id="global-toggle" class="sr-only peer" checked />
@@ -38,6 +42,7 @@
         <div>
           <p class="text-xs text-gray-400">Current domain</p>
           <p id="domain-name" class="text-sm font-medium truncate max-w-[200px]">—</p>
+          <p id="policy-reason" class="policy-reason-text"></p>
         </div>
         <label class="relative inline-flex items-center cursor-pointer" id="domain-toggle-label">
           <input type="checkbox" id="domain-toggle" class="sr-only peer" checked />
@@ -49,6 +54,41 @@
                    peer-checked:bg-emerald-500"
           ></div>
         </label>
+      </div>
+    </section>
+
+    <!-- Active defenses / module controls -->
+    <section class="px-4 py-3 border-b border-gray-800">
+      <p class="text-[10px] text-gray-500 uppercase mb-2">Active Defenses</p>
+      <div class="module-grid">
+        <label class="module-toggle-item" title="Event interception &amp; timestamp jitter">
+          <input type="checkbox" id="mod-intercept" class="sr-only" checked />
+          <span class="module-dot" id="dot-intercept"></span>
+          <span class="module-label">Intercept</span>
+        </label>
+        <label class="module-toggle-item" title="Synthetic event injection">
+          <input type="checkbox" id="mod-poison" class="sr-only" checked />
+          <span class="module-dot" id="dot-poison"></span>
+          <span class="module-label">Poison</span>
+        </label>
+        <label class="module-toggle-item" title="Canvas / WebGL / Navigator spoofing">
+          <input type="checkbox" id="mod-fingerprint" class="sr-only" checked />
+          <span class="module-dot" id="dot-fingerprint"></span>
+          <span class="module-label">Fingerprint</span>
+        </label>
+        <label class="module-toggle-item" title="PII sanitization in forms &amp; paste">
+          <input type="checkbox" id="mod-sanitize" class="sr-only" checked />
+          <span class="module-dot" id="dot-sanitize"></span>
+          <span class="module-label">Sanitize</span>
+        </label>
+      </div>
+      <!-- Quick preset buttons -->
+      <div class="preset-row mt-2">
+        <span class="text-[9px] text-gray-600 uppercase tracking-widest mr-1">Preset:</span>
+        <button class="preset-btn" data-preset="low">Low</button>
+        <button class="preset-btn" data-preset="medium">Medium</button>
+        <button class="preset-btn" data-preset="high">High</button>
+        <button class="preset-btn" data-preset="paranoid">Paranoid</button>
       </div>
     </section>
 
@@ -135,15 +175,39 @@
       </div>
     </section>
 
+    <!-- Diagnostics panel -->
+    <section class="px-4 py-3 border-b border-gray-800">
+      <button id="diag-toggle-btn" class="flex items-center justify-between w-full text-[10px] text-gray-500 uppercase tracking-widest">
+        <span>Diagnostics</span>
+        <span id="diag-arrow" class="feed-arrow">▼</span>
+      </button>
+      <div id="diag-container" class="diag-container" style="display:none;">
+        <!-- Module counter rows -->
+        <div id="module-counters" class="module-counters mt-2"></div>
+        <!-- Recent incidents -->
+        <div id="incidents-list" class="incidents-list mt-2"></div>
+        <p id="diag-empty" class="text-[10px] text-gray-600 text-center py-2" style="display:none;">No incidents recorded</p>
+      </div>
+    </section>
+
     <!-- Footer -->
     <footer class="px-4 py-2 border-t border-gray-800 flex items-center justify-between">
       <span class="text-[9px] text-gray-600">Alt+Shift+V to toggle</span>
-      <button
-        id="reset-btn"
-        class="text-[10px] text-gray-500 hover:text-red-400 uppercase tracking-widest transition-colors"
-      >
-        Reset Session
-      </button>
+      <div class="flex items-center gap-3">
+        <button
+          id="export-btn"
+          class="text-[10px] text-gray-500 hover:text-sky-400 uppercase tracking-widest transition-colors"
+          title="Export local diagnostics snapshot (no data leaves your device)"
+        >
+          Export
+        </button>
+        <button
+          id="reset-btn"
+          class="text-[10px] text-gray-500 hover:text-red-400 uppercase tracking-widest transition-colors"
+        >
+          Reset Session
+        </button>
+      </div>
     </footer>
 
     <script type="module" src="popup.ts"></script>
