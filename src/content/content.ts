@@ -237,14 +237,26 @@ function generateSyntheticClick(baseEvent: MouseEvent): MouseEvent {
 
 function generateSyntheticKey(
   type: "keydown" | "keyup",
-  baseEvent: KeyboardEvent,
+  _baseEvent: KeyboardEvent,
 ): KeyboardEvent {
-  // Use a randomised key from a plausible character set
-  const chars = "abcdefghijklmnopqrstuvwxyz0123456789 ";
-  const key = chars[randInt(0, chars.length - 1)];
+  // Use a randomised key from a plausible character set with correct code mappings
+  const letters = "abcdefghijklmnopqrstuvwxyz";
+  const digits = "0123456789";
+  const all = letters + digits + " ";
+  const key = all[randInt(0, all.length - 1)];
+
+  let code: string;
+  if (key === " ") {
+    code = "Space";
+  } else if (digits.includes(key)) {
+    code = `Digit${key}`;
+  } else {
+    code = `Key${key.toUpperCase()}`;
+  }
+
   return new KeyboardEvent(type, {
     key,
-    code: `Key${key.toUpperCase()}`,
+    code,
     bubbles: true,
     cancelable: true,
   });
@@ -471,8 +483,17 @@ function attachInputWatcher(root: HTMLElement): void {
       const { sanitized, changed } = sanitizeText(text);
       if (changed) {
         evt.preventDefault();
-        // Insert the sanitized text instead
-        document.execCommand("insertText", false, sanitized);
+        // Insert sanitized text using Selection/Range API (execCommand is deprecated)
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          range.deleteContents();
+          range.insertNode(document.createTextNode(sanitized));
+          // Collapse cursor to end of inserted text
+          range.collapse(false);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
         pendingSanitized++;
       }
     });

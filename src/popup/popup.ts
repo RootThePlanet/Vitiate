@@ -38,30 +38,30 @@ let settings: VitiateSettings | null = null;
 /* ================================================================== */
 
 const chartData: ChartData<"line", number[], string> = {
-    labels: [],
-    datasets: [
-      {
-        label: "Intercepted",
-        data: [],
-        borderColor: "#34d399",
-        backgroundColor: "rgba(52,211,153,0.1)",
-        fill: true,
-        tension: 0.4,
-        pointRadius: 0,
-        borderWidth: 2,
-      },
-      {
-        label: "Poisoned",
-        data: [],
-        borderColor: "#fbbf24",
-        backgroundColor: "rgba(251,191,36,0.1)",
-        fill: true,
-        tension: 0.4,
-        pointRadius: 0,
-        borderWidth: 2,
-      },
-    ],
-  };
+  labels: [],
+  datasets: [
+    {
+      label: "Intercepted",
+      data: [],
+      borderColor: "#34d399",
+      backgroundColor: "rgba(52,211,153,0.1)",
+      fill: true,
+      tension: 0.4,
+      pointRadius: 0,
+      borderWidth: 2,
+    },
+    {
+      label: "Poisoned",
+      data: [],
+      borderColor: "#fbbf24",
+      backgroundColor: "rgba(251,191,36,0.1)",
+      fill: true,
+      tension: 0.4,
+      pointRadius: 0,
+      borderWidth: 2,
+    },
+  ],
+};
 
 const activityChart = new Chart(chartCanvas, {
   type: "line",
