@@ -7,11 +7,18 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body class="w-[360px] bg-gray-950 text-gray-100 font-sans">
-    <!-- Header -->
-    <header class="flex items-center justify-between px-4 py-3 border-b border-gray-800">
+    <!-- Header with animated shield -->
+    <header class="header-glow flex items-center justify-between px-4 py-3 border-b border-gray-800" id="header">
       <div class="flex items-center gap-2">
-        <span class="text-lg font-bold tracking-tight text-emerald-400">⛨ Vitiate</span>
-        <span class="text-[10px] text-gray-500 uppercase tracking-widest">v1.0</span>
+        <div class="shield-container" id="shield-icon">
+          <svg class="shield-svg" width="22" height="26" viewBox="0 0 22 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M11 1L1 5V12C1 18.075 5.225 23.725 11 25C16.775 23.725 21 18.075 21 12V5L11 1Z"
+              stroke="currentColor" stroke-width="1.5" fill="none" class="shield-path"/>
+            <path d="M7 13L10 16L15 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shield-check"/>
+          </svg>
+        </div>
+        <span class="text-lg font-bold tracking-tight text-emerald-400">Vitiate</span>
+        <span class="text-[10px] text-gray-500 uppercase tracking-widest">v1.1</span>
       </div>
       <label class="relative inline-flex items-center cursor-pointer" id="global-toggle-label">
         <input type="checkbox" id="global-toggle" class="sr-only peer" checked />
@@ -45,30 +52,92 @@
       </div>
     </section>
 
-    <!-- Stats cards -->
-    <section class="grid grid-cols-3 gap-2 px-4 py-3 border-b border-gray-800">
-      <div class="text-center">
-        <p class="text-lg font-bold text-emerald-400" id="stat-intercepted">0</p>
-        <p class="text-[10px] text-gray-500 uppercase">Intercepted</p>
+    <!-- Intensity control -->
+    <section class="px-4 py-3 border-b border-gray-800">
+      <div class="flex items-center justify-between mb-2">
+        <p class="text-xs text-gray-400">Poisoning Intensity</p>
+        <span id="intensity-label" class="intensity-badge text-[10px] font-bold uppercase tracking-widest">Medium</span>
       </div>
-      <div class="text-center">
-        <p class="text-lg font-bold text-amber-400" id="stat-poisoned">0</p>
-        <p class="text-[10px] text-gray-500 uppercase">Poisoned</p>
+      <input type="range" id="intensity-slider" min="0" max="3" step="1" value="1" class="intensity-slider" />
+      <div class="flex justify-between text-[9px] text-gray-600 mt-1">
+        <span>Low</span><span>Medium</span><span>High</span><span>Paranoid</span>
       </div>
-      <div class="text-center">
-        <p class="text-lg font-bold text-sky-400" id="stat-sanitized">0</p>
-        <p class="text-[10px] text-gray-500 uppercase">Sanitized</p>
+    </section>
+
+    <!-- Session stats cards -->
+    <section class="px-4 py-3 border-b border-gray-800">
+      <p class="text-[10px] text-gray-500 uppercase mb-2">This Session</p>
+      <div class="grid grid-cols-3 gap-2">
+        <div class="stat-card stat-card-emerald text-center">
+          <p class="text-lg font-bold text-emerald-400 stat-value" id="stat-intercepted">0</p>
+          <div class="sparkline sparkline-emerald" id="spark-intercepted"></div>
+          <p class="text-[10px] text-gray-500 uppercase">Intercepted</p>
+        </div>
+        <div class="stat-card stat-card-amber text-center">
+          <p class="text-lg font-bold text-amber-400 stat-value" id="stat-poisoned">0</p>
+          <div class="sparkline sparkline-amber" id="spark-poisoned"></div>
+          <p class="text-[10px] text-gray-500 uppercase">Poisoned</p>
+        </div>
+        <div class="stat-card stat-card-sky text-center">
+          <p class="text-lg font-bold text-sky-400 stat-value" id="stat-sanitized">0</p>
+          <div class="sparkline sparkline-sky" id="spark-sanitized"></div>
+          <p class="text-[10px] text-gray-500 uppercase">Sanitized</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Lifetime stats -->
+    <section class="px-4 py-3 border-b border-gray-800">
+      <p class="text-[10px] text-gray-500 uppercase mb-2">All Time</p>
+      <div class="grid grid-cols-3 gap-2">
+        <div class="text-center">
+          <p class="text-sm font-bold text-emerald-400" id="lifetime-intercepted" style="opacity:0.7">0</p>
+          <p class="text-[9px] text-gray-600 uppercase">Intercepted</p>
+        </div>
+        <div class="text-center">
+          <p class="text-sm font-bold text-amber-400" id="lifetime-poisoned" style="opacity:0.7">0</p>
+          <p class="text-[9px] text-gray-600 uppercase">Poisoned</p>
+        </div>
+        <div class="text-center">
+          <p class="text-sm font-bold text-sky-400" id="lifetime-sanitized" style="opacity:0.7">0</p>
+          <p class="text-[9px] text-gray-600 uppercase">Sanitized</p>
+        </div>
       </div>
     </section>
 
     <!-- Chart -->
-    <section class="px-4 py-3">
+    <section class="px-4 py-3 border-b border-gray-800">
       <p class="text-[10px] text-gray-500 uppercase mb-2">Session Activity</p>
-      <canvas id="activity-chart" width="328" height="140"></canvas>
+      <canvas id="activity-chart" width="328" height="120"></canvas>
+    </section>
+
+    <!-- Activity feed -->
+    <section class="px-4 py-3 border-b border-gray-800">
+      <button id="feed-toggle-btn" class="flex items-center justify-between w-full text-[10px] text-gray-500 uppercase tracking-widest">
+        <span>Live Activity Feed</span>
+        <span id="feed-arrow" class="feed-arrow">▼</span>
+      </button>
+      <div id="feed-container" class="feed-container" style="display:none;">
+        <div id="feed-list" class="feed-list"></div>
+        <p id="feed-empty" class="text-[10px] text-gray-600 text-center py-2">No activity yet</p>
+      </div>
+    </section>
+
+    <!-- Domain management panel -->
+    <section class="px-4 py-3 border-b border-gray-800">
+      <button id="domains-toggle-btn" class="flex items-center justify-between w-full text-[10px] text-gray-500 uppercase tracking-widest">
+        <span>Managed Domains</span>
+        <span id="domains-arrow" class="feed-arrow">▼</span>
+      </button>
+      <div id="domains-container" class="domains-container" style="display:none;">
+        <div id="domains-list" class="domains-list"></div>
+        <p id="domains-empty" class="text-[10px] text-gray-600 text-center py-2">No domain overrides</p>
+      </div>
     </section>
 
     <!-- Footer -->
-    <footer class="px-4 py-2 border-t border-gray-800 text-center">
+    <footer class="px-4 py-2 border-t border-gray-800 flex items-center justify-between">
+      <span class="text-[9px] text-gray-600">Alt+Shift+V to toggle</span>
       <button
         id="reset-btn"
         class="text-[10px] text-gray-500 hover:text-red-400 uppercase tracking-widest transition-colors"

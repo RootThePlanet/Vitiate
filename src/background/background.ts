@@ -3,8 +3,11 @@
  *
  * Responsibilities:
  * 1. Persist and serve VitiateSettings via chrome.storage.local
- * 2. Aggregate per-session metrics reported by content scripts
+ * 2. Aggregate per-session and lifetime metrics reported by content scripts
  * 3. Relay state between popup ↔ content via chrome.runtime messaging
+ * 4. Manage toolbar badge (live event count + status color)
+ * 5. Handle keyboard shortcut quick-toggle
+ * 6. Maintain real-time activity feed
  *
  * Zero network I/O — all processing is local.
  */
@@ -13,8 +16,12 @@ import {
   type VitiateMessage,
   type VitiateSettings,
   type SessionMetrics,
+  type LifetimeMetrics,
+  type ActivityEntry,
   defaultSettings,
   defaultMetrics,
+  defaultLifetimeMetrics,
+  formatCompactNumber,
 } from "../shared/types";
 
 /* ------------------------------------------------------------------ */
@@ -22,13 +29,20 @@ import {
 /* ------------------------------------------------------------------ */
 let sessionMetrics: SessionMetrics = defaultMetrics();
 
+/** Circular buffer for real-time activity feed (last 50 entries) */
+const MAX_FEED = 50;
+let activityFeed: ActivityEntry[] = [];
+
 /* ------------------------------------------------------------------ */
 /*  Settings helpers                                                   */
 /* ------------------------------------------------------------------ */
 
 async function loadSettings(): Promise<VitiateSettings> {
   const result = await chrome.storage.local.get("vitiate_settings");
-  return (result.vitiate_settings as VitiateSettings) ?? defaultSettings();
+  const stored = result.vitiate_settings as VitiateSettings | undefined;
+  if (!stored) return defaultSettings();
+  // Ensure new fields have defaults for users upgrading from older versions
+  return { ...defaultSettings(), ...stored };
 }
 
 async function saveSettings(settings: VitiateSettings): Promise<void> {
@@ -45,6 +59,19 @@ function isDomainEnabled(settings: VitiateSettings, domain?: string): boolean {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Lifetime metrics helpers                                           */
+/* ------------------------------------------------------------------ */
+
+async function loadLifetimeMetrics(): Promise<LifetimeMetrics> {
+  const result = await chrome.storage.local.get("vitiate_lifetime");
+  return (result.vitiate_lifetime as LifetimeMetrics) ?? defaultLifetimeMetrics();
+}
+
+async function saveLifetimeMetrics(metrics: LifetimeMetrics): Promise<void> {
+  await chrome.storage.local.set({ vitiate_lifetime: metrics });
+}
+
+/* ------------------------------------------------------------------ */
 /*  Metrics helpers                                                    */
 /* ------------------------------------------------------------------ */
 
@@ -57,7 +84,7 @@ function getTimelineKey(): string {
     .padStart(2, "0")}`;
 }
 
-function applyMetricsDelta(delta: Partial<SessionMetrics>): void {
+async function applyMetricsDelta(delta: Partial<SessionMetrics>): Promise<void> {
   if (delta.interceptedEvents) {
     sessionMetrics.interceptedEvents += delta.interceptedEvents;
   }
@@ -73,6 +100,35 @@ function applyMetricsDelta(delta: Partial<SessionMetrics>): void {
   }
   sessionMetrics.timeline[key].intercepted += delta.interceptedEvents ?? 0;
   sessionMetrics.timeline[key].poisoned += delta.syntheticEventsInjected ?? 0;
+
+  // Persist to lifetime metrics
+  const lifetime = await loadLifetimeMetrics();
+  lifetime.interceptedEvents += delta.interceptedEvents ?? 0;
+  lifetime.syntheticEventsInjected += delta.syntheticEventsInjected ?? 0;
+  lifetime.sanitizedInputs += delta.sanitizedInputs ?? 0;
+  await saveLifetimeMetrics(lifetime);
+
+  // Update badge
+  await updateBadge();
+}
+
+/* ------------------------------------------------------------------ */
+/*  Toolbar badge                                                      */
+/* ------------------------------------------------------------------ */
+
+async function updateBadge(): Promise<void> {
+  const settings = await loadSettings();
+  if (!settings.enabled) {
+    await chrome.action.setBadgeText({ text: "OFF" });
+    await chrome.action.setBadgeBackgroundColor({ color: "#6b7280" }); // gray
+    return;
+  }
+
+  const total = sessionMetrics.interceptedEvents + sessionMetrics.syntheticEventsInjected;
+  const text = total === 0 ? "" : formatCompactNumber(total);
+
+  await chrome.action.setBadgeText({ text });
+  await chrome.action.setBadgeBackgroundColor({ color: "#34d399" }); // emerald
 }
 
 /* ------------------------------------------------------------------ */
@@ -93,7 +149,7 @@ chrome.runtime.onMessage.addListener(
 
 async function handleMessage(
   msg: VitiateMessage,
-  sender: chrome.runtime.MessageSender,
+  _sender: chrome.runtime.MessageSender,
   sendResponse: (response: VitiateMessage) => void,
 ): Promise<void> {
   switch (msg.type) {
@@ -107,6 +163,7 @@ async function handleMessage(
       const current = await loadSettings();
       const merged: VitiateSettings = { ...current, ...msg.settings };
       await saveSettings(merged);
+      await updateBadge();
       break;
     }
     case "TOGGLE_DOMAIN": {
@@ -115,20 +172,52 @@ async function handleMessage(
       await saveSettings(settings);
       break;
     }
+    case "REMOVE_DOMAIN": {
+      const settings = await loadSettings();
+      delete settings.domainOverrides[msg.domain];
+      await saveSettings(settings);
+      break;
+    }
     case "GET_METRICS": {
-      sendResponse({ type: "METRICS_RESPONSE", metrics: sessionMetrics });
+      const lifetime = await loadLifetimeMetrics();
+      sendResponse({ type: "METRICS_RESPONSE", metrics: sessionMetrics, lifetime, feed: activityFeed });
       break;
     }
     case "REPORT_METRICS": {
-      applyMetricsDelta(msg.delta);
+      await applyMetricsDelta(msg.delta);
+      break;
+    }
+    case "REPORT_ACTIVITY": {
+      for (const entry of msg.entries) {
+        activityFeed.push(entry);
+      }
+      // Keep feed bounded
+      if (activityFeed.length > MAX_FEED) {
+        activityFeed = activityFeed.slice(-MAX_FEED);
+      }
       break;
     }
     case "RESET_METRICS": {
       sessionMetrics = defaultMetrics();
+      activityFeed = [];
+      await updateBadge();
       break;
     }
   }
 }
+
+/* ------------------------------------------------------------------ */
+/*  Keyboard shortcut handler (Alt+Shift+V toggle)                     */
+/* ------------------------------------------------------------------ */
+
+chrome.commands.onCommand.addListener(async (command: string) => {
+  if (command === "toggle-protection") {
+    const settings = await loadSettings();
+    settings.enabled = !settings.enabled;
+    await saveSettings(settings);
+    await updateBadge();
+  }
+});
 
 /* ------------------------------------------------------------------ */
 /*  Extension lifecycle                                                */
@@ -139,4 +228,5 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (!existing.vitiate_settings) {
     await saveSettings(defaultSettings());
   }
+  await updateBadge();
 });
