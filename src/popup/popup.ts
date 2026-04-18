@@ -12,13 +12,14 @@
  */
 
 import { Chart, type ChartData, registerables } from "chart.js";
-import type {
-  VitiateMessage,
-  VitiateSettings,
-  SessionMetrics,
-  LifetimeMetrics,
-  ActivityEntry,
-  IntensityLevel,
+import {
+  type VitiateMessage,
+  type VitiateSettings,
+  type SessionMetrics,
+  type LifetimeMetrics,
+  type ActivityEntry,
+  type IntensityLevel,
+  formatCompactNumber,
 } from "../shared/types";
 
 Chart.register(...registerables);
@@ -246,10 +247,13 @@ function renderLifetimeMetrics(lifetime: LifetimeMetrics): void {
   lifetimeSanitized.textContent = formatNumber(lifetime.sanitizedInputs);
 }
 
-function formatNumber(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toString();
+const formatNumber = formatCompactNumber;
+
+function formatTime(date: Date): string {
+  const h = date.getHours().toString().padStart(2, "0");
+  const m = date.getMinutes().toString().padStart(2, "0");
+  const s = date.getSeconds().toString().padStart(2, "0");
+  return `${h}:${m}:${s}`;
 }
 
 /* ================================================================== */
@@ -341,8 +345,10 @@ function renderActivityFeed(entries: ActivityEntry[]): void {
   }
   feedEmpty.style.display = "none";
 
-  // Only re-render if feed has new entries
-  if (feedList.childElementCount === entries.length) return;
+  // Only re-render if feed content has actually changed
+  const latestTime = entries.length > 0 ? entries[entries.length - 1].time : "";
+  if (feedList.childElementCount > 0 && feedList.dataset.latestTime === latestTime) return;
+  feedList.dataset.latestTime = latestTime;
 
   feedList.innerHTML = "";
   // Show newest first, limit to last 20
@@ -358,7 +364,7 @@ function renderActivityFeed(entries: ActivityEntry[]): void {
     };
 
     const time = new Date(entry.time);
-    const timeStr = `${time.getHours().toString().padStart(2, "0")}:${time.getMinutes().toString().padStart(2, "0")}:${time.getSeconds().toString().padStart(2, "0")}`;
+    const timeStr = formatTime(time);
 
     el.innerHTML = `
       <span class="feed-icon">${iconMap[entry.kind]}</span>

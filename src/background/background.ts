@@ -21,6 +21,7 @@ import {
   defaultSettings,
   defaultMetrics,
   defaultLifetimeMetrics,
+  formatCompactNumber,
 } from "../shared/types";
 
 /* ------------------------------------------------------------------ */
@@ -124,16 +125,7 @@ async function updateBadge(): Promise<void> {
   }
 
   const total = sessionMetrics.interceptedEvents + sessionMetrics.syntheticEventsInjected;
-  let text: string;
-  if (total === 0) {
-    text = "";
-  } else if (total >= 1_000_000) {
-    text = `${(total / 1_000_000).toFixed(0)}M`;
-  } else if (total >= 1_000) {
-    text = `${(total / 1_000).toFixed(0)}K`;
-  } else {
-    text = total.toString();
-  }
+  const text = total === 0 ? "" : formatCompactNumber(total);
 
   await chrome.action.setBadgeText({ text });
   await chrome.action.setBadgeBackgroundColor({ color: "#34d399" }); // emerald

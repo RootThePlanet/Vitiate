@@ -565,17 +565,22 @@ function poisonCanvasFingerprint(): void {
  * a single session.
  */
 function spoofNavigatorAndScreen(): void {
-  // Generate plausible per-session values
-  const spoofedConcurrency = [2, 4, 8, 12, 16][randInt(0, 4)];
-  const spoofedMemory = [2, 4, 8, 16][randInt(0, 3)];
-  const spoofedPlatform = ["Win32", "Linux x86_64", "MacIntel"][randInt(0, 2)];
-  const spoofedLanguages: readonly string[] = [
+  // Generate plausible per-session values using array-length-derived bounds
+  const concurrencyOptions = [2, 4, 8, 12, 16];
+  const spoofedConcurrency = concurrencyOptions[randInt(0, concurrencyOptions.length - 1)];
+  const memoryOptions = [2, 4, 8, 16];
+  const spoofedMemory = memoryOptions[randInt(0, memoryOptions.length - 1)];
+  const platformOptions = ["Win32", "Linux x86_64", "MacIntel"];
+  const spoofedPlatform = platformOptions[randInt(0, platformOptions.length - 1)];
+  const languageOptions: readonly string[][] = [
     ["en-US", "en"],
     ["en-GB", "en"],
     ["en-US"],
     ["en-US", "en", "es"],
-  ][randInt(0, 3)];
-  const spoofedColorDepth = [24, 30, 32][randInt(0, 2)];
+  ];
+  const spoofedLanguages: readonly string[] = languageOptions[randInt(0, languageOptions.length - 1)];
+  const colorDepthOptions = [24, 30, 32];
+  const spoofedColorDepth = colorDepthOptions[randInt(0, colorDepthOptions.length - 1)];
   const resolutions = [
     [1920, 1080],
     [2560, 1440],
