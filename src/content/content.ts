@@ -113,9 +113,30 @@ const SYNTHETIC_KEY = "__vitiate_synthetic__";
 
 type AnyListener = EventListenerOrEventListenerObject;
 type OriginalAddEventListener = typeof EventTarget.prototype.addEventListener;
+type OriginalRemoveEventListener = typeof EventTarget.prototype.removeEventListener;
+
+/**
+ * Registry that maps each original listener to its per-type wrapped counterpart.
+ * WeakMap keys are garbage-collected when the listener is collected, preventing leaks.
+ */
+const wrapperRegistry = new WeakMap<AnyListener, Map<string, EventListener>>();
+
+function getWrapped(listener: AnyListener, type: string): EventListener | undefined {
+  return wrapperRegistry.get(listener)?.get(type);
+}
+
+function setWrapped(listener: AnyListener, type: string, wrapped: EventListener): void {
+  let inner = wrapperRegistry.get(listener);
+  if (!inner) {
+    inner = new Map();
+    wrapperRegistry.set(listener, inner);
+  }
+  inner.set(type, wrapped);
+}
 
 function patchAddEventListener(proto: EventTarget): void {
   const original: OriginalAddEventListener = proto.addEventListener;
+  const originalRemove: OriginalRemoveEventListener = proto.removeEventListener;
 
   proto.addEventListener = function (
     type: string,
@@ -130,27 +151,47 @@ function patchAddEventListener(proto: EventTarget): void {
       return original.call(this, type, listener, options);
     }
 
-    const wrappedListener: EventListener = (evt: Event) => {
-      if (!engineEnabled || (evt as unknown as Record<string, unknown>)[SYNTHETIC_KEY]) {
-        if (typeof listener === "function") {
-          listener(evt);
-        } else {
-          listener.handleEvent(evt);
+    // Reuse an existing wrapper if one was already registered for this listener+type
+    // so that duplicate addEventListener calls are handled consistently.
+    let wrappedListener = getWrapped(listener, type);
+    if (!wrappedListener) {
+      wrappedListener = (evt: Event) => {
+        if (!engineEnabled || (evt as unknown as Record<string, unknown>)[SYNTHETIC_KEY]) {
+          if (typeof listener === "function") {
+            listener(evt);
+          } else {
+            listener.handleEvent(evt);
+          }
+          return;
         }
-        return;
-      }
 
-      pendingIntercepted++;
+        pendingIntercepted++;
 
-      const mutated = maybeMutateTimestamp(evt);
-      if (typeof listener === "function") {
-        listener(mutated);
-      } else {
-        listener.handleEvent(mutated);
-      }
-    };
+        const mutated = maybeMutateTimestamp(evt);
+        if (typeof listener === "function") {
+          listener(mutated);
+        } else {
+          listener.handleEvent(mutated);
+        }
+      };
+      setWrapped(listener, type, wrappedListener);
+    }
 
     return original.call(this, type, wrappedListener, options);
+  };
+
+  // Mirror removeEventListener so callers can cleanly deregister the original listener
+  // reference even though the browser registered the wrapped version.
+  proto.removeEventListener = function (
+    type: string,
+    listener: AnyListener | null,
+    options?: boolean | EventListenerOptions,
+  ): void {
+    if (!listener || !trackedSet.has(type)) {
+      return originalRemove.call(this, type, listener, options);
+    }
+    const wrapped = getWrapped(listener, type) ?? listener;
+    return originalRemove.call(this, type, wrapped, options);
   };
 }
 
@@ -435,14 +476,22 @@ function attachInputWatcher(root: HTMLElement): void {
       const { sanitized, changed } = sanitizeText(text);
       if (changed) {
         evt.preventDefault();
-        const selection = window.getSelection();
-        if (selection && selection.rangeCount > 0) {
-          const range = selection.getRangeAt(0);
-          range.deleteContents();
-          range.insertNode(document.createTextNode(sanitized));
-          range.collapse(false);
-          selection.removeAllRanges();
-          selection.addRange(range);
+        if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
+          // Use setRangeText for reliable insertion into form fields
+          const start = el.selectionStart ?? el.value.length;
+          const end = el.selectionEnd ?? el.value.length;
+          el.setRangeText(sanitized, start, end, "end");
+        } else {
+          // contenteditable: use Selection + Range API
+          const selection = window.getSelection();
+          if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(document.createTextNode(sanitized));
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
         }
         pendingSanitized++;
         pushActivity("sanitized", "PII redacted from paste");
@@ -471,16 +520,23 @@ function poisonCanvasFingerprint(): void {
   ): string {
     if (!engineEnabled) return origToDataURL.apply(this, args);
 
-    // Inject a tiny invisible pixel change before reading
+    // Work on a temporary copy so the original canvas pixels are never mutated
     try {
-      const ctx = this.getContext("2d");
-      if (ctx) {
-        const imgData = ctx.getImageData(0, 0, 1, 1);
-        imgData.data[0] = (imgData.data[0] + noiseSeed) & 0xff;
-        ctx.putImageData(imgData, 0, 0);
+      if (this.width > 0 && this.height > 0) {
+        const tmp = document.createElement("canvas");
+        tmp.width = this.width;
+        tmp.height = this.height;
+        const tmpCtx = tmp.getContext("2d");
+        if (tmpCtx) {
+          tmpCtx.drawImage(this, 0, 0);
+          const imgData = tmpCtx.getImageData(0, 0, 1, 1);
+          imgData.data[0] = (imgData.data[0] + noiseSeed) & 0xff;
+          tmpCtx.putImageData(imgData, 0, 0);
+          return origToDataURL.apply(tmp, args);
+        }
       }
     } catch {
-      // Canvas may be tainted (cross-origin) — ignore
+      // Tainted (cross-origin) or zero-size canvas — fall through
     }
     return origToDataURL.apply(this, args);
   };
@@ -494,15 +550,23 @@ function poisonCanvasFingerprint(): void {
   ): void {
     if (!engineEnabled) return origToBlob.call(this, callback, type, quality);
 
+    // Work on a temporary copy so the original canvas pixels are never mutated
     try {
-      const ctx = this.getContext("2d");
-      if (ctx) {
-        const imgData = ctx.getImageData(0, 0, 1, 1);
-        imgData.data[1] = (imgData.data[1] + noiseSeed) & 0xff;
-        ctx.putImageData(imgData, 0, 0);
+      if (this.width > 0 && this.height > 0) {
+        const tmp = document.createElement("canvas");
+        tmp.width = this.width;
+        tmp.height = this.height;
+        const tmpCtx = tmp.getContext("2d");
+        if (tmpCtx) {
+          tmpCtx.drawImage(this, 0, 0);
+          const imgData = tmpCtx.getImageData(0, 0, 1, 1);
+          imgData.data[1] = (imgData.data[1] + noiseSeed) & 0xff;
+          tmpCtx.putImageData(imgData, 0, 0);
+          return origToBlob.call(tmp, callback, type, quality);
+        }
       }
     } catch {
-      // Canvas may be tainted
+      // Tainted (cross-origin) or zero-size canvas — fall through
     }
     return origToBlob.call(this, callback, type, quality);
   };
