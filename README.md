@@ -11,7 +11,9 @@
 
 Vitiate is a Manifest V3 browser extension that poisons behavioral telemetry and reduces biometric signal quality for automated scraping systems.
 
-It runs fully local, adds controlled noise to event streams, and gives you per-domain control over how aggressive the protection should be.
+It runs fully locally, adds controlled noise to event streams, and gives you per-domain control over how aggressive the protection should be.
+
+> Vitiate is built to raise the cost of behavioral profiling — not to guarantee anonymity.
 
 ## What it does
 
@@ -81,5 +83,4 @@ npm run dev
 
 ## Notes
 
-Vitiate is designed to raise the cost of behavioral profiling, not guarantee anonymity.
 Use it as one layer in a broader privacy posture.
