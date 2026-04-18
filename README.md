@@ -1,78 +1,85 @@
 # Vitiate
 
-Browser extension that actively poisons behavioral data to defend against autonomous AI scraping and biometric profiling.
+```text
+██╗   ██╗██╗████████╗██╗ █████╗ ████████╗███████╗
+██║   ██║██║╚══██╔══╝██║██╔══██╗╚══██╔══╝██╔════╝
+██║   ██║██║   ██║   ██║███████║   ██║   █████╗
+╚██╗ ██╔╝██║   ██║   ██║██╔══██║   ██║   ██╔══╝
+ ╚████╔╝ ██║   ██║   ██║██║  ██║   ██║   ███████╗
+  ╚═══╝  ╚═╝   ╚═╝   ╚═╝╚═╝  ╚═╝   ╚═╝   ╚══════╝
+```
+
+Vitiate is a Manifest V3 browser extension that poisons behavioral telemetry and reduces biometric signal quality for automated scraping systems.
+
+It runs fully local, adds controlled noise to event streams, and gives you per-domain control over how aggressive the protection should be.
+
+## What it does
+
+- Intercepts high-signal browser events (`mousemove`, `click`, `keydown`, `keyup`, `scroll`, `submit`)
+- Injects synthetic noise events with intensity-aware profiles
+- Obfuscates keystroke timing fingerprints
+- Sanitizes likely PII patterns in form and paste flows
+- Poisons common canvas / WebGL fingerprinting paths
+- Spoofs select navigator/screen fingerprinting properties
+- Tracks session + lifetime metrics in a live popup dashboard
 
 ## Architecture
 
-Vitiate operates as a persistent local firewall between the user and the browser DOM. It injects mathematically sound but flawed behavioral noise into the DOM event stream to confuse hostile AI scrapers while maintaining a seamless user experience.
+| Module | File | Responsibility |
+|---|---|---|
+| Background Service Worker | `src/background/background.ts` | Settings persistence, metrics aggregation, message routing, badge state |
+| Content Script | `src/content/content.ts` | Event interception, poisoning engine, sanitization, fingerprint defenses |
+| Popup UI | `src/popup/popup.ts` | Runtime controls, metrics rendering, activity feed, domain management |
+| Shared Types | `src/shared/types.ts` | Cross-module contracts and defaults |
 
-### Core Modules
+## Project layout
 
-| Module | File | Purpose |
-|--------|------|---------|
-| **Background Service Worker** | `src/background/background.ts` | Settings persistence, metrics aggregation, message routing |
-| **Content Script** | `src/content/content.ts` | Event interception, data poisoning, prompt sanitization |
-| **Popup UI** | `src/popup/popup.ts` | Dashboard, toggle controls, session activity chart |
-| **Shared Types** | `src/shared/types.ts` | TypeScript interfaces shared across all modules |
-
-### Folder Structure
-
-```
-vitiate/
+```text
+Vitiate/
 ├── public/
-│   ├── manifest.json          # Manifest V3 configuration
-│   └── icons/                 # Extension icons
+│   ├── manifest.json
+│   └── icons/
 ├── src/
 │   ├── background/
-│   │   └── background.ts      # Service Worker
+│   │   └── background.ts
 │   ├── content/
-│   │   └── content.ts         # Content Script (Phases 2–4)
+│   │   └── content.ts
 │   ├── popup/
-│   │   ├── popup.html         # Popup UI
-│   │   ├── popup.css          # Styles
-│   │   └── popup.ts           # Popup logic + Chart.js
+│   │   ├── popup.html
+│   │   ├── popup.css
+│   │   └── popup.ts
 │   └── shared/
-│       └── types.ts           # Shared TypeScript types
-├── vite.config.ts
+│       └── types.ts
 ├── tsconfig.json
+├── vite.config.ts
 └── package.json
 ```
 
-## Features
-
-- **Event Interception** — Hooks `mousemove`, `click`, `keydown`, `keyup`, `scroll`, and `submit` via addEventListener prototype override
-- **Data Poisoning** — Generates 3–5 synthetic events per genuine user event using a fast xorshift128+ PRNG
-- **Typing Cadence Obfuscation** — Randomises `timeStamp` on key events to defeat inter-keystroke timing analysis
-- **Prompt Sanitization** — Regex-based PII detection on textarea/contenteditable elements before submission
-- **Per-Domain Control** — Enable/disable protection globally or per-domain
-- **Session Dashboard** — Real-time metrics and activity chart in the popup UI
-
-## Development
+## Dev workflow
 
 ```bash
-# Install dependencies
 npm install
-
-# Type-check
 npm run typecheck
-
-# Build for production
 npm run build
-
-# Watch mode
 npm run dev
 ```
 
-## Loading the Extension
+## Load in Chrome
 
 1. Run `npm run build`
-2. Open `chrome://extensions/` in Chrome
-3. Enable "Developer mode"
-4. Click "Load unpacked" and select the `dist/` folder
+2. Open `chrome://extensions/`
+3. Enable **Developer mode**
+4. Click **Load unpacked**
+5. Select the generated `dist/` directory
 
-## Constraints
+## Security and runtime constraints
 
-- **Zero network latency** — All processing is local; no external API calls
-- **< 2 ms synthetic event generation** — Uses xorshift128+ PRNG and requestIdleCallback
-- **Strict CSP** — `script-src 'self'; object-src 'none'` prevents XSS vectors
+- No external API calls
+- No remote code execution
+- Strict extension CSP
+- Local-only processing path for detection, poisoning, and metrics
 
+## Notes
+
+Vitiate is designed to raise the cost of behavioral profiling, not guarantee anonymity.
+Use it as one layer in a broader privacy posture.
