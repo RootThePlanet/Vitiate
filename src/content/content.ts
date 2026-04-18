@@ -62,6 +62,19 @@ const MAX_ACTIVITY_BUFFER = 20;
 /** URL / hostname pattern that indicates a sensitive (payment / auth) page */
 const SENSITIVE_URL_RE = /bank|pay(?:ment|pal)?|checkout|billing|wallet|finance|credit|transaction|signin|login|auth/i;
 
+/** Marker property name stamped onto synthetic events so wrappers can skip them */
+const SYNTHETIC_KEY = "__vitiate_synthetic__";
+
+/** Returns true if the event was created by Vitiate (not real user input). */
+function isSynthetic(evt: Event): boolean {
+  return (evt as unknown as Record<string, unknown>)[SYNTHETIC_KEY] === true;
+}
+
+/** Stamps the Vitiate synthetic marker onto an event in-place. */
+function markSynthetic(evt: Event): void {
+  (evt as unknown as Record<string, unknown>)[SYNTHETIC_KEY] = true;
+}
+
 /* ================================================================== */
 /*  Runtime state                                                      */
 /* ================================================================== */
@@ -274,7 +287,7 @@ function buildCoherentFingerprintBundle(): FingerprintBundle {
     screenWidth:         sw,
     screenHeight:        sh,
     colorDepth:          profile.colorDepths[randInt(0, profile.colorDepths.length - 1)],
-    canvasNoiseSeed:     randInt(1, 255),
+    canvasNoiseSeed:     randInt(1, 65535),
   };
 }
 
@@ -403,7 +416,6 @@ function spoofNavigatorAndScreen(bundle: FingerprintBundle): void {
 /*  Module 1 — Interception: addEventListener patching                */
 /* ================================================================== */
 
-const SYNTHETIC_KEY = "__vitiate_synthetic__";
 const trackedSet = new Set<string>(TRACKED_EVENTS);
 
 type AnyListener = EventListenerOrEventListenerObject;
@@ -456,8 +468,7 @@ function patchAddEventListener(proto: EventTarget): void {
     let wrapped = getWrapped(listener, type);
     if (!wrapped) {
       wrapped = (evt: Event) => {
-        const isSynthetic = (evt as unknown as Record<string, unknown>)[SYNTHETIC_KEY];
-        if (!engineEnabled || isSynthetic) {
+        if (!engineEnabled || isSynthetic(evt)) {
           // Pass synthetic events through without processing
           if (typeof listener === "function") listener(evt);
           else listener.handleEvent(evt);
@@ -512,7 +523,7 @@ function generateMouseArc(base: MouseEvent, count: number): MouseEvent[] {
 
   for (let i = 0; i < count; i++) {
     const t      = (i + 1) / (count + 1);
-    // ease-in-out: cubic
+    // Cubic ease-in-out: accelerate from 0→0.5, decelerate from 0.5→1
     const eased  = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
     const x      = Math.round(base.clientX + (targetX - base.clientX) * eased + randGaussian(0, 2));
     const y      = Math.round(base.clientY + (targetY - base.clientY) * eased + randGaussian(0, 2));
@@ -526,7 +537,7 @@ function generateMouseArc(base: MouseEvent, count: number): MouseEvent[] {
       bubbles:   true,
       cancelable: true,
     });
-    (evt as unknown as Record<string, unknown>)[SYNTHETIC_KEY] = true;
+    markSynthetic(evt);
     events.push(evt);
   }
   return events;
@@ -541,14 +552,16 @@ function generateSyntheticClick(base: MouseEvent): MouseEvent {
     bubbles:   true,
     cancelable: true,
   });
-  (evt as unknown as Record<string, unknown>)[SYNTHETIC_KEY] = true;
+  markSynthetic(evt);
   return evt;
 }
 
 /**
  * Generate a synthetic keystroke using approximate English letter-frequency
- * distribution so the key mix is more realistic than uniform random.
+ * distribution (ETAOIN SHRDLU ordering) so the key mix is more realistic
+ * than a uniform random selection.
  */
+// Letter frequencies derived from ETAOIN SHRDLU — repeated chars approximate real distribution
 const KEY_POOL = "eeeeeeeeeeetttttttttaaaaaaaaoooooooiiiiiiiinnnnnnnsssssssrrrrrrrhhhhhhldddccuuummmfffggppwwyyyybbvvkxjqz ";
 const DIGIT_POOL = "0123456789";
 
@@ -563,13 +576,13 @@ function generateRealisticKey(type: "keydown" | "keyup"): KeyboardEvent {
   else                   code = `Key${key.toUpperCase()}`;
 
   const evt = new KeyboardEvent(type, { key, code, bubbles: true, cancelable: true });
-  (evt as unknown as Record<string, unknown>)[SYNTHETIC_KEY] = true;
+  markSynthetic(evt);
   return evt;
 }
 
 function generateSyntheticScroll(): Event {
   const evt = new Event("scroll", { bubbles: true, cancelable: false });
-  (evt as unknown as Record<string, unknown>)[SYNTHETIC_KEY] = true;
+  markSynthetic(evt);
   return evt;
 }
 
@@ -660,7 +673,7 @@ function attachEventDelegation(): void {
     document.addEventListener(
       eventType,
       (evt: Event) => {
-        if ((evt as unknown as Record<string, unknown>)[SYNTHETIC_KEY]) return;
+        if (isSynthetic(evt)) return;
         enqueueSynthetics(evt);
       },
       { capture: true, passive: true },
@@ -833,7 +846,7 @@ function flushMetrics(): void {
         module: mid,
         delta: { processed: c.processed, errors: c.errors, skippedRateLimit: c.skippedRateLimit },
       } satisfies VitiateMessage).catch(() => {});
-      localCounters[mid] = defaultModuleCounter();
+      localCounters[mid] = { ...defaultModuleCounter(), lastActiveMs: c.lastActiveMs };
     }
   }
 

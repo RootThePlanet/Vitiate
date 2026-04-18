@@ -93,15 +93,19 @@ async function saveLifetimeMetrics(metrics: LifetimeMetrics): Promise<void> {
 /*  Health helpers                                                     */
 /* ------------------------------------------------------------------ */
 
+/** Health-status computation thresholds */
+const HEALTH_ERROR_THRESHOLD    = 10;
+const HEALTH_DEGRADED_THRESHOLD = 100;
+
 async function computeHealth(): Promise<HealthStatus> {
   const settings = await loadSettings();
   if (!settings.enabled) return "disabled";
 
   const totalErrors = Object.values(moduleCounters).reduce((s, c) => s + c.errors, 0);
-  if (totalErrors > 10) return "error";
+  if (totalErrors > HEALTH_ERROR_THRESHOLD) return "error";
 
   const totalSkipped = Object.values(moduleCounters).reduce((s, c) => s + c.skippedRateLimit, 0);
-  if (totalSkipped > 100) return "degraded";
+  if (totalSkipped > HEALTH_DEGRADED_THRESHOLD) return "degraded";
 
   return "active";
 }
@@ -277,7 +281,7 @@ async function handleMessage(
       const lifetime  = await loadLifetimeMetrics();
       const health    = await computeHealth();
       const snapshot: DiagnosticsSnapshot = {
-        vitiateVersion: "1.2.0",
+        vitiateVersion: chrome.runtime.getManifest().version,
         exportedAt:     new Date().toISOString(),
         schemaVersion:  SCHEMA_VERSION,
         settings,

@@ -635,7 +635,7 @@ exportBtn.addEventListener("click", async () => {
     const url      = URL.createObjectURL(blob);
     const a        = document.createElement("a");
     a.href         = url;
-    a.download     = `vitiate-snapshot-${new Date().toISOString().slice(0, 19).replace(/[:]/g, "-")}.json`;
+    a.download     = `vitiate-snapshot-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.json`;
     a.click();
     URL.revokeObjectURL(url);
   } catch {
