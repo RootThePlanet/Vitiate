@@ -1,0 +1,122 @@
+/*
+ * Vitiate Popup Styles
+ * Tailwind-inspired utility classes written as plain CSS
+ * (avoids a Tailwind build step for extension popup).
+ */
+
+/* ---- Reset ---- */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ---- Base ---- */
+body {
+  width: 360px;
+  background-color: #030712; /* gray-950 */
+  color: #f3f4f6;           /* gray-100 */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ---- Layout utilities ---- */
+.flex { display: flex; }
+.grid { display: grid; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-2 { gap: 0.5rem; }
+.grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.text-center { text-align: center; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.max-w-\[200px\] { max-width: 200px; }
+.w-\[360px\] { width: 360px; }
+.relative { position: relative; }
+.inline-flex { display: inline-flex; }
+.cursor-pointer { cursor: pointer; }
+
+/* ---- Spacing ---- */
+.px-4 { padding-left: 1rem; padding-right: 1rem; }
+.py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+.py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+
+/* ---- Borders ---- */
+.border-b { border-bottom: 1px solid; }
+.border-t { border-top: 1px solid; }
+.border-gray-800 { border-color: #1f2937; }
+
+/* ---- Typography ---- */
+.text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+.text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+.text-xs { font-size: 0.75rem; line-height: 1rem; }
+.text-\[10px\] { font-size: 10px; line-height: 1.2; }
+.font-bold { font-weight: 700; }
+.font-medium { font-weight: 500; }
+.tracking-tight { letter-spacing: -0.025em; }
+.tracking-widest { letter-spacing: 0.1em; }
+.uppercase { text-transform: uppercase; }
+
+/* ---- Colors ---- */
+.text-emerald-400 { color: #34d399; }
+.text-amber-400 { color: #fbbf24; }
+.text-sky-400 { color: #38bdf8; }
+.text-gray-100 { color: #f3f4f6; }
+.text-gray-400 { color: #9ca3af; }
+.text-gray-500 { color: #6b7280; }
+.bg-gray-950 { background-color: #030712; }
+.bg-gray-700 { background-color: #374151; }
+
+/* ---- Toggle switch ---- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+label.relative > div {
+  width: 2.25rem;    /* w-9 */
+  height: 1.25rem;   /* h-5 */
+  background-color: #374151;
+  border-radius: 9999px;
+  position: relative;
+  transition: background-color 0.2s;
+}
+
+label.relative > div::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1rem;
+  height: 1rem;
+  background-color: white;
+  border-radius: 9999px;
+  transition: transform 0.2s;
+}
+
+label.relative input:checked + div {
+  background-color: #34d399; /* emerald-500 */
+}
+
+label.relative input:checked + div::after {
+  transform: translateX(100%);
+}
+
+/* ---- Button ---- */
+button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+.hover\:text-red-400:hover { color: #f87171; }
+.transition-colors { transition: color 0.15s; }

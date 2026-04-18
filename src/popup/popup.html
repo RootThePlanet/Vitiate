@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vitiate</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body class="w-[360px] bg-gray-950 text-gray-100 font-sans">
+    <!-- Header -->
+    <header class="flex items-center justify-between px-4 py-3 border-b border-gray-800">
+      <div class="flex items-center gap-2">
+        <span class="text-lg font-bold tracking-tight text-emerald-400">⛨ Vitiate</span>
+        <span class="text-[10px] text-gray-500 uppercase tracking-widest">v1.0</span>
+      </div>
+      <label class="relative inline-flex items-center cursor-pointer" id="global-toggle-label">
+        <input type="checkbox" id="global-toggle" class="sr-only peer" checked />
+        <div
+          class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer
+                 peer-checked:after:translate-x-full peer-checked:after:border-white
+                 after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+                 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all
+                 peer-checked:bg-emerald-500"
+        ></div>
+      </label>
+    </header>
+
+    <!-- Domain control -->
+    <section class="px-4 py-3 border-b border-gray-800">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs text-gray-400">Current domain</p>
+          <p id="domain-name" class="text-sm font-medium truncate max-w-[200px]">—</p>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer" id="domain-toggle-label">
+          <input type="checkbox" id="domain-toggle" class="sr-only peer" checked />
+          <div
+            class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer
+                   peer-checked:after:translate-x-full peer-checked:after:border-white
+                   after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+                   after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all
+                   peer-checked:bg-emerald-500"
+          ></div>
+        </label>
+      </div>
+    </section>
+
+    <!-- Stats cards -->
+    <section class="grid grid-cols-3 gap-2 px-4 py-3 border-b border-gray-800">
+      <div class="text-center">
+        <p class="text-lg font-bold text-emerald-400" id="stat-intercepted">0</p>
+        <p class="text-[10px] text-gray-500 uppercase">Intercepted</p>
+      </div>
+      <div class="text-center">
+        <p class="text-lg font-bold text-amber-400" id="stat-poisoned">0</p>
+        <p class="text-[10px] text-gray-500 uppercase">Poisoned</p>
+      </div>
+      <div class="text-center">
+        <p class="text-lg font-bold text-sky-400" id="stat-sanitized">0</p>
+        <p class="text-[10px] text-gray-500 uppercase">Sanitized</p>
+      </div>
+    </section>
+
+    <!-- Chart -->
+    <section class="px-4 py-3">
+      <p class="text-[10px] text-gray-500 uppercase mb-2">Session Activity</p>
+      <canvas id="activity-chart" width="328" height="140"></canvas>
+    </section>
+
+    <!-- Footer -->
+    <footer class="px-4 py-2 border-t border-gray-800 text-center">
+      <button
+        id="reset-btn"
+        class="text-[10px] text-gray-500 hover:text-red-400 uppercase tracking-widest transition-colors"
+      >
+        Reset Session
+      </button>
+    </footer>
+
+    <script type="module" src="popup.ts"></script>
+  </body>
+</html>
