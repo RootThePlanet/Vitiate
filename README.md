@@ -1,12 +1,3 @@
-```text
-██╗   ██╗██╗████████╗██╗ █████╗ ████████╗███████╗
-██║   ██║██║╚══██╔══╝██║██╔══██╗╚══██╔══╝██╔════╝
-██║   ██║██║   ██║   ██║███████║   ██║   █████╗
-╚██╗ ██╔╝██║   ██║   ██║██╔══██║   ██║   ██╔══╝
- ╚████╔╝ ██║   ██║   ██║██║  ██║   ██║   ███████╗
-  ╚═══╝  ╚═╝   ╚═╝   ╚═╝╚═╝  ╚═╝   ╚═╝   ╚══════╝
-```
-
 ![Vitiate](./public/marquee/vitiate.png)
 
 Vitiate is a Manifest V3 browser extension that poisons behavioral telemetry and reduces biometric signal quality for automated scraping systems.
