@@ -26,5 +26,6 @@
 
 1. Download the latest repository ZIP from GitHub.
 2. Extract it.
-3. In `chrome://extensions/`, find Vitiate and click **Remove** (or **Reload** after reselecting folder).
+3. In `chrome://extensions/`, find Vitiate and click **Remove**.
 4. Click **Load unpacked** and select the new `chrome-extension/` folder.
+5. If you kept the exact same extracted folder path and only replaced its contents, you can click **Reload** instead.
