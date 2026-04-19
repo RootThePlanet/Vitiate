@@ -1,0 +1,683 @@
+/*
+ * Vitiate Popup Styles
+ * Tailwind-inspired utility classes written as plain CSS
+ * (avoids a Tailwind build step for extension popup).
+ */
+
+/* ---- Reset ---- */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ---- Base ---- */
+body {
+  width: 360px;
+  background-color: #030712; /* gray-950 */
+  color: #f3f4f6;           /* gray-100 */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ---- Layout utilities ---- */
+.flex { display: flex; }
+.grid { display: grid; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-2 { gap: 0.5rem; }
+.gap-3 { gap: 0.75rem; }
+.grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.text-center { text-align: center; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.max-w-\[200px\] { max-width: 200px; }
+.w-\[360px\] { width: 360px; }
+.w-full { width: 100%; }
+.relative { position: relative; }
+.inline-flex { display: inline-flex; }
+.cursor-pointer { cursor: pointer; }
+
+/* ---- Spacing ---- */
+.px-4 { padding-left: 1rem; padding-right: 1rem; }
+.py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+.py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mt-1 { margin-top: 0.25rem; }
+.mt-2 { margin-top: 0.5rem; }
+.mr-1 { margin-right: 0.25rem; }
+
+/* ---- Borders ---- */
+.border-b { border-bottom: 1px solid; }
+.border-t { border-top: 1px solid; }
+.border-gray-800 { border-color: #1f2937; }
+
+/* ---- Typography ---- */
+.text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+.text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+.text-xs { font-size: 0.75rem; line-height: 1rem; }
+.text-\[10px\] { font-size: 10px; line-height: 1.2; }
+.text-\[9px\] { font-size: 9px; line-height: 1.2; }
+.font-bold { font-weight: 700; }
+.font-medium { font-weight: 500; }
+.tracking-tight { letter-spacing: -0.025em; }
+.tracking-widest { letter-spacing: 0.1em; }
+.uppercase { text-transform: uppercase; }
+
+/* ---- Colors ---- */
+.text-emerald-400 { color: #34d399; }
+.text-amber-400 { color: #fbbf24; }
+.text-sky-400 { color: #38bdf8; }
+.text-gray-100 { color: #f3f4f6; }
+.text-gray-400 { color: #9ca3af; }
+.text-gray-500 { color: #6b7280; }
+.text-gray-600 { color: #4b5563; }
+.bg-gray-950 { background-color: #030712; }
+.bg-gray-700 { background-color: #374151; }
+
+/* ---- Toggle switch ---- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+label.relative > div {
+  width: 2.25rem;
+  height: 1.25rem;
+  background-color: #374151;
+  border-radius: 9999px;
+  position: relative;
+  transition: background-color 0.2s;
+}
+
+label.relative > div::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1rem;
+  height: 1rem;
+  background-color: white;
+  border-radius: 9999px;
+  transition: transform 0.2s;
+}
+
+label.relative input:checked + div {
+  background-color: #34d399;
+}
+
+label.relative input:checked + div::after {
+  transform: translateX(100%);
+}
+
+/* ---- Button ---- */
+button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+.hover\:text-red-400:hover { color: #f87171; }
+.hover\:text-sky-400:hover { color: #38bdf8; }
+.transition-colors { transition: color 0.15s; }
+
+/* ==================================================================
+   Health Indicator
+   ================================================================== */
+
+.health-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4b5563;
+  flex-shrink: 0;
+}
+
+.health-dot.health-active   { background: #34d399; box-shadow: 0 0 5px rgba(52,211,153,0.6); }
+.health-dot.health-degraded { background: #fbbf24; box-shadow: 0 0 5px rgba(251,191,36,0.6); }
+.health-dot.health-error    { background: #f87171; box-shadow: 0 0 5px rgba(248,113,113,0.6); }
+.health-dot.health-disabled { background: #6b7280; }
+
+.health-text {
+  color: #6b7280;
+}
+.health-text.health-active   { color: #34d399; }
+.health-text.health-degraded { color: #fbbf24; }
+.health-text.health-error    { color: #f87171; }
+.health-text.health-disabled { color: #6b7280; }
+
+/* ==================================================================
+   Policy reason line
+   ================================================================== */
+
+.policy-reason-text {
+  font-size: 9px;
+  color: #4b5563;
+  margin-top: 1px;
+  line-height: 1.2;
+}
+
+/* ==================================================================
+   Module controls grid
+   ================================================================== */
+
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.module-toggle-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.04);
+  transition: background 0.15s, border-color 0.15s;
+  user-select: none;
+}
+
+.module-toggle-item:hover {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.1);
+}
+
+.module-toggle-item input:checked + .module-dot {
+  background: #34d399;
+  box-shadow: 0 0 4px rgba(52,211,153,0.5);
+}
+
+.module-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #374151;
+  flex-shrink: 0;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+.module-label {
+  font-size: 9px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+/* ==================================================================
+   Preset buttons
+   ================================================================== */
+
+.preset-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.preset-btn {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.preset-btn:hover {
+  background: rgba(52,211,153,0.12);
+  color: #34d399;
+  border-color: rgba(52,211,153,0.3);
+}
+
+.preset-btn.active {
+  background: rgba(52,211,153,0.15);
+  color: #34d399;
+  border-color: rgba(52,211,153,0.4);
+}
+
+/* ==================================================================
+   IMPROVEMENT 9: Animated Shield Header with Status Glow
+   ================================================================== */
+
+.shield-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shield-svg {
+  color: #34d399;
+  filter: drop-shadow(0 0 6px rgba(52, 211, 153, 0.5));
+  animation: shield-pulse 2s ease-in-out infinite;
+}
+
+.shield-svg.disabled {
+  color: #6b7280;
+  filter: drop-shadow(0 0 2px rgba(107, 114, 128, 0.3));
+  animation: none;
+}
+
+@keyframes shield-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 6px rgba(52, 211, 153, 0.5));
+  }
+  50% {
+    filter: drop-shadow(0 0 12px rgba(52, 211, 153, 0.8));
+  }
+}
+
+.header-glow {
+  position: relative;
+  overflow: hidden;
+}
+
+.header-glow::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -10%;
+  width: 120%;
+  height: 200%;
+  background: radial-gradient(ellipse at 15% 50%, rgba(52, 211, 153, 0.06) 0%, transparent 70%);
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.header-glow.disabled::before {
+  opacity: 0;
+}
+
+/* ==================================================================
+   IMPROVEMENT 2: Intensity Slider
+   ================================================================== */
+
+.intensity-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(to right, #34d399, #fbbf24, #f97316, #ef4444);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.intensity-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: #f3f4f6;
+  border-radius: 50%;
+  border: 2px solid #34d399;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.intensity-slider::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.5);
+}
+
+.intensity-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: #f3f4f6;
+  border-radius: 50%;
+  border: 2px solid #34d399;
+  cursor: pointer;
+}
+
+.intensity-badge {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(52, 211, 153, 0.15);
+  color: #34d399;
+  transition: background 0.2s, color 0.2s;
+}
+
+.intensity-badge.level-low {
+  background: rgba(52, 211, 153, 0.15);
+  color: #34d399;
+}
+.intensity-badge.level-medium {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+}
+.intensity-badge.level-high {
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+}
+.intensity-badge.level-paranoid {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* ==================================================================
+   IMPROVEMENT 10: Stat Cards with Micro-Animations & Sparklines
+   ================================================================== */
+
+.stat-card {
+  padding: 6px 4px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.stat-card-emerald:hover {
+  background: rgba(52, 211, 153, 0.05);
+  border-color: rgba(52, 211, 153, 0.15);
+  box-shadow: 0 0 12px rgba(52, 211, 153, 0.1);
+}
+
+.stat-card-amber:hover {
+  background: rgba(251, 191, 36, 0.05);
+  border-color: rgba(251, 191, 36, 0.15);
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.1);
+}
+
+.stat-card-sky:hover {
+  background: rgba(56, 189, 248, 0.05);
+  border-color: rgba(56, 189, 248, 0.15);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.1);
+}
+
+.stat-value {
+  transition: transform 0.15s ease-out;
+}
+
+.stat-value.bump {
+  transform: scale(1.15);
+}
+
+/* Sparkline bars */
+.sparkline {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 1px;
+  height: 12px;
+  margin: 2px auto;
+  width: 60px;
+}
+
+.sparkline-bar {
+  width: 3px;
+  min-height: 1px;
+  border-radius: 1px;
+  transition: height 0.3s ease-out;
+}
+
+.sparkline-emerald .sparkline-bar { background: rgba(52, 211, 153, 0.5); }
+.sparkline-amber .sparkline-bar { background: rgba(251, 191, 36, 0.5); }
+.sparkline-sky .sparkline-bar { background: rgba(56, 189, 248, 0.5); }
+
+/* ==================================================================
+   IMPROVEMENT 7: Activity Feed
+   ================================================================== */
+
+.feed-container {
+  margin-top: 0.5rem;
+  max-height: 160px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #374151 transparent;
+}
+
+.feed-container::-webkit-scrollbar {
+  width: 4px;
+}
+.feed-container::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 2px;
+}
+
+.feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.feed-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 1.3;
+  background: rgba(255, 255, 255, 0.02);
+  animation: feed-slide-in 0.2s ease-out;
+}
+
+@keyframes feed-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.feed-icon {
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.feed-time {
+  color: #4b5563;
+  flex-shrink: 0;
+  min-width: 42px;
+}
+
+.feed-detail {
+  color: #9ca3af;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feed-arrow {
+  transition: transform 0.2s;
+  font-size: 8px;
+}
+.feed-arrow.open {
+  transform: rotate(180deg);
+}
+
+/* ==================================================================
+   IMPROVEMENT 6: Domain Management Panel
+   ================================================================== */
+
+.domains-container {
+  margin-top: 0.5rem;
+  max-height: 150px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #374151 transparent;
+}
+
+.domains-container::-webkit-scrollbar {
+  width: 4px;
+}
+.domains-container::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 2px;
+}
+
+.domains-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.domain-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 11px;
+}
+
+.domain-entry-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.domain-entry-name {
+  color: #d1d5db;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.domain-entry-status {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.domain-entry-status.enabled { background: #34d399; }
+.domain-entry-status.disabled { background: #ef4444; }
+
+.domain-remove-btn {
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 4px;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+.domain-remove-btn:hover {
+  color: #f87171;
+}
+
+/* ==================================================================
+   Diagnostics Panel
+   ================================================================== */
+
+.diag-container {
+  margin-top: 0.5rem;
+  max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #374151 transparent;
+}
+
+.diag-container::-webkit-scrollbar {
+  width: 4px;
+}
+.diag-container::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 2px;
+}
+
+/* Module counter grid (2 columns) */
+.module-counters {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+}
+
+.module-counter-item {
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.04);
+}
+
+.module-counter-name {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+  margin-bottom: 2px;
+}
+
+.module-counter-stats {
+  display: flex;
+  gap: 6px;
+  font-size: 9px;
+}
+
+.module-counter-ok    { color: #34d399; }
+.module-counter-err   { color: #f87171; }
+.module-counter-skip  { color: #fbbf24; }
+
+/* Incident list */
+.incidents-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.incident-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: rgba(248,113,113,0.04);
+  border-left: 2px solid rgba(248,113,113,0.25);
+  font-size: 9px;
+}
+
+.incident-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.incident-module {
+  color: #fbbf24;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.incident-domain {
+  color: #6b7280;
+}
+
+.incident-count {
+  margin-left: auto;
+  color: #f87171;
+}
+
+.incident-message {
+  color: #9ca3af;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.incident-time {
+  color: #4b5563;
+}
