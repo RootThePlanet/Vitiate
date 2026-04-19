@@ -38,6 +38,7 @@ import {
   isDomainEnabled,
   SCHEMA_VERSION,
 } from "../shared/types";
+import { extensionApi } from "../shared/extension-api";
 
 /* ------------------------------------------------------------------ */
 /*  In-memory session state (reset each time the SW spins up)         */
@@ -66,14 +67,14 @@ const moduleCounters: Record<ModuleId, ModuleCounter> = {
 /* ------------------------------------------------------------------ */
 
 async function loadSettings(): Promise<VitiateSettings> {
-  const result = await chrome.storage.local.get("vitiate_settings");
+  const result = await extensionApi.storage.local.get("vitiate_settings");
   const stored = result.vitiate_settings as Record<string, unknown> | undefined;
   if (!stored) return defaultSettings();
   return migrateSettings(stored);
 }
 
 async function saveSettings(settings: VitiateSettings): Promise<void> {
-  await chrome.storage.local.set({ vitiate_settings: settings });
+  await extensionApi.storage.local.set({ vitiate_settings: settings });
 }
 
 /* ------------------------------------------------------------------ */
@@ -81,12 +82,12 @@ async function saveSettings(settings: VitiateSettings): Promise<void> {
 /* ------------------------------------------------------------------ */
 
 async function loadLifetimeMetrics(): Promise<LifetimeMetrics> {
-  const result = await chrome.storage.local.get("vitiate_lifetime");
+  const result = await extensionApi.storage.local.get("vitiate_lifetime");
   return (result.vitiate_lifetime as LifetimeMetrics) ?? defaultLifetimeMetrics();
 }
 
 async function saveLifetimeMetrics(metrics: LifetimeMetrics): Promise<void> {
-  await chrome.storage.local.set({ vitiate_lifetime: metrics });
+  await extensionApi.storage.local.set({ vitiate_lifetime: metrics });
 }
 
 /* ------------------------------------------------------------------ */
@@ -147,22 +148,22 @@ async function applyMetricsDelta(delta: Partial<SessionMetrics>): Promise<void> 
 async function updateBadge(): Promise<void> {
   const settings = await loadSettings();
   if (!settings.enabled) {
-    await chrome.action.setBadgeText({ text: "OFF" });
-    await chrome.action.setBadgeBackgroundColor({ color: "#6b7280" });
+    await extensionApi.action.setBadgeText({ text: "OFF" });
+    await extensionApi.action.setBadgeBackgroundColor({ color: "#6b7280" });
     return;
   }
 
   const total = sessionMetrics.interceptedEvents + sessionMetrics.syntheticEventsInjected;
   const text = total === 0 ? "" : formatCompactNumber(total);
-  await chrome.action.setBadgeText({ text });
-  await chrome.action.setBadgeBackgroundColor({ color: "#34d399" });
+  await extensionApi.action.setBadgeText({ text });
+  await extensionApi.action.setBadgeBackgroundColor({ color: "#34d399" });
 }
 
 /* ------------------------------------------------------------------ */
 /*  Message router                                                     */
 /* ------------------------------------------------------------------ */
 
-chrome.runtime.onMessage.addListener(
+extensionApi.runtime.onMessage.addListener(
   (
     message: VitiateMessage,
     sender: chrome.runtime.MessageSender,
@@ -281,7 +282,7 @@ async function handleMessage(
       const lifetime  = await loadLifetimeMetrics();
       const health    = await computeHealth();
       const snapshot: DiagnosticsSnapshot = {
-        vitiateVersion: chrome.runtime.getManifest().version,
+        vitiateVersion: extensionApi.runtime.getManifest().version,
         exportedAt:     new Date().toISOString(),
         schemaVersion:  SCHEMA_VERSION,
         settings,
@@ -301,7 +302,7 @@ async function handleMessage(
 /*  Keyboard shortcut handler (Alt+Shift+V toggle)                    */
 /* ------------------------------------------------------------------ */
 
-chrome.commands.onCommand.addListener(async (command: string) => {
+extensionApi.commands.onCommand.addListener(async (command: string) => {
   if (command === "toggle-protection") {
     const settings = await loadSettings();
     settings.enabled = !settings.enabled;
@@ -314,8 +315,8 @@ chrome.commands.onCommand.addListener(async (command: string) => {
 /*  Extension lifecycle                                                */
 /* ------------------------------------------------------------------ */
 
-chrome.runtime.onInstalled.addListener(async () => {
-  const existing = await chrome.storage.local.get("vitiate_settings");
+extensionApi.runtime.onInstalled.addListener(async () => {
+  const existing = await extensionApi.storage.local.get("vitiate_settings");
   if (!existing.vitiate_settings) {
     await saveSettings(defaultSettings());
   } else {

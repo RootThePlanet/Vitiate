@@ -36,6 +36,7 @@ import {
   INTENSITY_CONFIGS,
   defaultModuleCounter,
 } from "../shared/types";
+import { extensionApi } from "../shared/extension-api";
 
 /* ================================================================== */
 /*  Configuration constants                                            */
@@ -170,7 +171,7 @@ function pushActivity(kind: ActivityEntry["kind"], detail: string): void {
 function flushActivity(): void {
   if (activityBuffer.length === 0) return;
   const entries = activityBuffer.splice(0);
-  chrome.runtime.sendMessage({ type: "REPORT_ACTIVITY", entries } satisfies VitiateMessage).catch(() => {});
+  extensionApi.runtime.sendMessage({ type: "REPORT_ACTIVITY", entries } satisfies VitiateMessage).catch(() => {});
 }
 
 /* ================================================================== */
@@ -193,7 +194,7 @@ function trackRateLimit(module: ModuleId): void {
 }
 
 function reportIncident(module: ModuleId, message: string): void {
-  chrome.runtime.sendMessage({
+  extensionApi.runtime.sendMessage({
     type: "REPORT_INCIDENT",
     incident: { time: new Date().toISOString(), domain: location.hostname, module, message },
   } satisfies VitiateMessage).catch(() => {});
@@ -823,7 +824,7 @@ function flushMetrics(): void {
   if (pendingSynthetic   > 0) pushActivity("poisoned",    `${pendingSynthetic} synthetic events injected`);
 
   if (pendingIntercepted > 0 || pendingSynthetic > 0 || pendingSanitized > 0) {
-    chrome.runtime.sendMessage({
+    extensionApi.runtime.sendMessage({
       type: "REPORT_METRICS",
       delta: {
         interceptedEvents:       pendingIntercepted,
@@ -841,7 +842,7 @@ function flushMetrics(): void {
   for (const mid of Object.keys(localCounters) as ModuleId[]) {
     const c = localCounters[mid];
     if (c.processed > 0 || c.errors > 0 || c.skippedRateLimit > 0) {
-      chrome.runtime.sendMessage({
+      extensionApi.runtime.sendMessage({
         type: "REPORT_MODULE_COUNTER",
         module: mid,
         delta: { processed: c.processed, errors: c.errors, skippedRateLimit: c.skippedRateLimit },
@@ -859,7 +860,7 @@ function flushMetrics(): void {
 
 async function init(): Promise<void> {
   try {
-    const response = await chrome.runtime.sendMessage({
+    const response = await extensionApi.runtime.sendMessage({
       type: "GET_SETTINGS",
       domain: location.hostname,
     } satisfies VitiateMessage) as VitiateMessage;

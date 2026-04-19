@@ -1,4 +1,4 @@
-import { R as RISK_TIER_PRESETS, f as formatCompactNumber } from './chunks/types-ytiEMfIF.js';
+import { R as RISK_TIER_PRESETS, e as extensionApi, h as formatCompactNumber } from './chunks/extension-api-jx66ihWQ.js';
 
 true              &&(function polyfill() {
   const relList = document.createElement("link").relList;
@@ -15075,11 +15075,11 @@ const activityChart = new Chart(chartCanvas, {
   }
 });
 function send(msg) {
-  return chrome.runtime.sendMessage(msg);
+  return extensionApi.runtime.sendMessage(msg);
 }
 async function loadCurrentDomain() {
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const [tab] = await extensionApi.tabs.query({ active: true, currentWindow: true });
     if (tab?.url) {
       currentDomain = new URL(tab.url).hostname;
     }
