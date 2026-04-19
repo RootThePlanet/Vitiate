@@ -36,6 +36,7 @@ It runs fully locally, adds controlled noise to event streams, and gives you per
 
 ```text
 Vitiate/
+├── chrome-extension/           # Prebuilt unpacked extension (no console required)
 ├── public/
 │   ├── manifest.json
 │   └── icons/
@@ -55,7 +56,21 @@ Vitiate/
 └── package.json
 ```
 
-## Dev workflow
+## Quick start (no console required)
+
+1. Download this repository as a ZIP and extract it.
+2. Open `chrome://extensions/`
+3. Enable **Developer mode**
+4. Click **Load unpacked**
+5. Select the `chrome-extension/` directory from the extracted folder
+
+## How-to guide
+
+See [`HOW_TO_GUIDE.md`](./HOW_TO_GUIDE.md) for a full click-by-click guide without terminal commands.
+
+## Dev workflow (optional)
+
+Only needed if you want to modify source code:
 
 ```bash
 npm install
@@ -63,14 +78,6 @@ npm run typecheck
 npm run build
 npm run dev
 ```
-
-## Load in Chrome
-
-1. Run `npm run build`
-2. Open `chrome://extensions/`
-3. Enable **Developer mode**
-4. Click **Load unpacked**
-5. Select the generated `dist/` directory
 
 ## Security and runtime constraints
 
