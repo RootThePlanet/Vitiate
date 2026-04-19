@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from "vite";
 import { resolve } from "path";
+import { copyFile, rm } from "fs/promises";
 import type { OutputBundle, OutputChunk } from "rollup";
 
 /**
@@ -51,32 +52,50 @@ function contentScriptIIFE(): Plugin {
   };
 }
 
-export default defineConfig({
-  base: "./",
-  build: {
-    outDir: "chrome-extension",
-    emptyOutDir: true,
-    rollupOptions: {
-      input: {
-        background: resolve(__dirname, "src/background/background.ts"),
-        content: resolve(__dirname, "src/content/content.ts"),
-        popup: resolve(__dirname, "src/popup/popup.html"),
+export default defineConfig(({ mode }) => {
+  const isFirefoxBuild = mode === "firefox";
+  const outDir = isFirefoxBuild ? "firefox-extension" : "chrome-extension";
+
+  return {
+    base: "./",
+    build: {
+      outDir,
+      emptyOutDir: true,
+      rollupOptions: {
+        input: {
+          background: resolve(__dirname, "src/background/background.ts"),
+          content: resolve(__dirname, "src/content/content.ts"),
+          popup: resolve(__dirname, "src/popup/popup.html"),
+        },
+        output: {
+          entryFileNames: "[name].js",
+          chunkFileNames: "chunks/[name]-[hash].js",
+          assetFileNames: "assets/[name][extname]",
+        },
+        plugins: [contentScriptIIFE()],
       },
-      output: {
-        entryFileNames: "[name].js",
-        chunkFileNames: "chunks/[name]-[hash].js",
-        assetFileNames: "assets/[name][extname]",
+      target: "esnext",
+      minify: false,
+      sourcemap: false,
+    },
+    resolve: {
+      alias: {
+        "@": resolve(__dirname, "src"),
       },
-      plugins: [contentScriptIIFE()],
     },
-    target: "esnext",
-    minify: false,
-    sourcemap: false,
-  },
-  resolve: {
-    alias: {
-      "@": resolve(__dirname, "src"),
-    },
-  },
-  publicDir: "public",
+    publicDir: "public",
+    plugins: [
+      {
+        name: "vitiate-firefox-manifest",
+        async closeBundle() {
+          if (!isFirefoxBuild) return;
+          await copyFile(
+            resolve(__dirname, "public/manifest.firefox.json"),
+            resolve(__dirname, outDir, "manifest.json"),
+          );
+          await rm(resolve(__dirname, outDir, "manifest.firefox.json"), { force: true });
+        },
+      },
+    ],
+  };
 });

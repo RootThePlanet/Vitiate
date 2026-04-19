@@ -30,8 +30,10 @@ It runs fully locally, adds controlled noise to event streams, and gives you per
 ```text
 Vitiate/
 ├── chrome-extension/           # Built unpacked extension
+├── firefox-extension/          # Built unpacked Firefox extension
 ├── public/
 │   ├── manifest.json
+│   ├── manifest.firefox.json
 │   └── icons/
 ├── src/
 │   ├── background/
@@ -55,6 +57,7 @@ Vitiate/
 npm install
 npm run typecheck
 npm run build
+npm run build:firefox
 ```
 
 Then:
@@ -63,6 +66,12 @@ Then:
 2. Enable **Developer mode**
 3. Click **Load unpacked**
 4. Select the `chrome-extension/` directory
+
+Firefox:
+
+1. Open `about:debugging#/runtime/this-firefox`
+2. Click **Load Temporary Add-on**
+3. Select `firefox-extension/manifest.json`
 
 ## Security and runtime constraints
 

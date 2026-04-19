@@ -33,6 +33,7 @@ import {
   formatCompactNumber,
   RISK_TIER_PRESETS,
 } from "../shared/types";
+import { extensionApi } from "../shared/extension-api";
 
 Chart.register(...registerables);
 
@@ -183,7 +184,7 @@ const activityChart = new Chart(chartCanvas, {
 /* ================================================================== */
 
 function send(msg: VitiateMessage): Promise<VitiateMessage> {
-  return chrome.runtime.sendMessage(msg);
+  return extensionApi.runtime.sendMessage(msg);
 }
 
 /* ================================================================== */
@@ -192,7 +193,7 @@ function send(msg: VitiateMessage): Promise<VitiateMessage> {
 
 async function loadCurrentDomain(): Promise<void> {
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const [tab] = await extensionApi.tabs.query({ active: true, currentWindow: true });
     if (tab?.url) {
       currentDomain = new URL(tab.url).hostname;
     }
