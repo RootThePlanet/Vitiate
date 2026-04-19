@@ -88,12 +88,12 @@ export default defineConfig(({ mode }) => {
       {
         name: "vitiate-firefox-manifest",
         async closeBundle() {
+          await rm(resolve(__dirname, outDir, "manifest.firefox.json"), { force: true });
           if (!isFirefoxBuild) return;
           await copyFile(
             resolve(__dirname, "public/manifest.firefox.json"),
             resolve(__dirname, outDir, "manifest.json"),
           );
-          await rm(resolve(__dirname, outDir, "manifest.firefox.json"), { force: true });
         },
       },
     ],

@@ -1,4 +1,4 @@
-import { S as SCHEMA_VERSION, d as defaultMetrics, a as defaultModuleCounter, i as isDomainEnabled, g as getPolicyReason, b as getEffectiveModulePolicy, m as migrateSettings, c as defaultSettings, e as defaultLifetimeMetrics, f as formatCompactNumber } from './chunks/types-ytiEMfIF.js';
+import { e as extensionApi, S as SCHEMA_VERSION, d as defaultMetrics, a as defaultModuleCounter, i as isDomainEnabled, g as getPolicyReason, b as getEffectiveModulePolicy, m as migrateSettings, c as defaultSettings, f as defaultLifetimeMetrics, h as formatCompactNumber } from './chunks/extension-api-jx66ihWQ.js';
 
 let sessionMetrics = defaultMetrics();
 const MAX_FEED = 50;
@@ -12,20 +12,20 @@ const moduleCounters = {
   sanitize: defaultModuleCounter()
 };
 async function loadSettings() {
-  const result = await chrome.storage.local.get("vitiate_settings");
+  const result = await extensionApi.storage.local.get("vitiate_settings");
   const stored = result.vitiate_settings;
   if (!stored) return defaultSettings();
   return migrateSettings(stored);
 }
 async function saveSettings(settings) {
-  await chrome.storage.local.set({ vitiate_settings: settings });
+  await extensionApi.storage.local.set({ vitiate_settings: settings });
 }
 async function loadLifetimeMetrics() {
-  const result = await chrome.storage.local.get("vitiate_lifetime");
+  const result = await extensionApi.storage.local.get("vitiate_lifetime");
   return result.vitiate_lifetime ?? defaultLifetimeMetrics();
 }
 async function saveLifetimeMetrics(metrics) {
-  await chrome.storage.local.set({ vitiate_lifetime: metrics });
+  await extensionApi.storage.local.set({ vitiate_lifetime: metrics });
 }
 const HEALTH_ERROR_THRESHOLD = 10;
 const HEALTH_DEGRADED_THRESHOLD = 100;
@@ -62,16 +62,16 @@ async function applyMetricsDelta(delta) {
 async function updateBadge() {
   const settings = await loadSettings();
   if (!settings.enabled) {
-    await chrome.action.setBadgeText({ text: "OFF" });
-    await chrome.action.setBadgeBackgroundColor({ color: "#6b7280" });
+    await extensionApi.action.setBadgeText({ text: "OFF" });
+    await extensionApi.action.setBadgeBackgroundColor({ color: "#6b7280" });
     return;
   }
   const total = sessionMetrics.interceptedEvents + sessionMetrics.syntheticEventsInjected;
   const text = total === 0 ? "" : formatCompactNumber(total);
-  await chrome.action.setBadgeText({ text });
-  await chrome.action.setBadgeBackgroundColor({ color: "#34d399" });
+  await extensionApi.action.setBadgeText({ text });
+  await extensionApi.action.setBadgeBackgroundColor({ color: "#34d399" });
 }
-chrome.runtime.onMessage.addListener(
+extensionApi.runtime.onMessage.addListener(
   (message, sender, sendResponse) => {
     handleMessage(message, sender, sendResponse);
     return true;
@@ -174,7 +174,7 @@ async function handleMessage(msg, _sender, sendResponse) {
       const lifetime = await loadLifetimeMetrics();
       const health = await computeHealth();
       const snapshot = {
-        vitiateVersion: chrome.runtime.getManifest().version,
+        vitiateVersion: extensionApi.runtime.getManifest().version,
         exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
         schemaVersion: SCHEMA_VERSION,
         settings,
@@ -189,7 +189,7 @@ async function handleMessage(msg, _sender, sendResponse) {
     }
   }
 }
-chrome.commands.onCommand.addListener(async (command) => {
+extensionApi.commands.onCommand.addListener(async (command) => {
   if (command === "toggle-protection") {
     const settings = await loadSettings();
     settings.enabled = !settings.enabled;
@@ -197,8 +197,8 @@ chrome.commands.onCommand.addListener(async (command) => {
     await updateBadge();
   }
 });
-chrome.runtime.onInstalled.addListener(async () => {
-  const existing = await chrome.storage.local.get("vitiate_settings");
+extensionApi.runtime.onInstalled.addListener(async () => {
+  const existing = await extensionApi.storage.local.get("vitiate_settings");
   if (!existing.vitiate_settings) {
     await saveSettings(defaultSettings());
   } else {
