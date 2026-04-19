@@ -7,6 +7,8 @@
   ╚═══╝  ╚═╝   ╚═╝   ╚═╝╚═╝  ╚═╝   ╚═╝   ╚══════╝
 ```
 
+![Vitiate](./public/marquee/vitiate.png)
+
 Vitiate is a Manifest V3 browser extension that poisons behavioral telemetry and reduces biometric signal quality for automated scraping systems.
 
 It runs fully locally, adds controlled noise to event streams, and gives you per-domain control over how aggressive the protection should be.
@@ -36,7 +38,7 @@ It runs fully locally, adds controlled noise to event streams, and gives you per
 
 ```text
 Vitiate/
-├── chrome-extension/           # Prebuilt unpacked extension (no console required)
+├── chrome-extension/           # Built unpacked extension
 ├── public/
 │   ├── manifest.json
 │   └── icons/
@@ -56,28 +58,20 @@ Vitiate/
 └── package.json
 ```
 
-## Quick start (no console required)
-
-1. Download this repository as a ZIP and extract it.
-2. Open `chrome://extensions/`
-3. Enable **Developer mode**
-4. Click **Load unpacked**
-5. Select the `chrome-extension/` directory from the extracted folder
-
-## How-to guide
-
-See [`HOW_TO_GUIDE.md`](./HOW_TO_GUIDE.md) for a full click-by-click guide without terminal commands.
-
-## Dev workflow (optional)
-
-Only needed if you want to modify source code:
+## Quick start
 
 ```bash
 npm install
 npm run typecheck
 npm run build
-npm run dev
 ```
+
+Then:
+
+1. Open `chrome://extensions/`
+2. Enable **Developer mode**
+3. Click **Load unpacked**
+4. Select the `chrome-extension/` directory
 
 ## Security and runtime constraints
 
