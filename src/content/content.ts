@@ -61,7 +61,7 @@ const METRICS_FLUSH_MS = 5_000;
 const MAX_ACTIVITY_BUFFER = 20;
 
 /** URL / hostname pattern that indicates a sensitive (payment / auth) page */
-const SENSITIVE_URL_RE = /bank|pay(?:ment|pal)?|checkout|billing|wallet|finance|credit|transaction|signin|login|auth/i;
+const SENSITIVE_URL_RE = /\b(?:bank|payment|paypal|checkout|billing|wallet|finance|credit|transaction|signin|login|auth)\b/i;
 
 /** Marker property name stamped onto synthetic events so wrappers can skip them */
 const SYNTHETIC_KEY = "__vitiate_synthetic__";
