@@ -3,10 +3,10 @@
   "name": "Vitiate",
   "version": "1.2.0",
   "description": "Advanced privacy extension that poisons behavioral data to defend against autonomous AI scraping and biometric profiling.",
+  "homepage_url": "https://github.com/RootThePlanet/Vitiate",
   "permissions": [
     "activeTab",
-    "storage",
-    "scripting"
+    "storage"
   ],
   "host_permissions": ["<all_urls>"],
   "background": {

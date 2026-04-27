@@ -1,6 +1,6 @@
 {
   "name": "vitiate",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Browser extension that actively poisons behavioral data to defend against autonomous AI scraping and biometric profiling.",
   "type": "module",
   "scripts": {

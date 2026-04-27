@@ -100,7 +100,7 @@ const TRACKED_EVENTS = [
 const MAX_QUEUE = 512;
 const METRICS_FLUSH_MS = 5e3;
 const MAX_ACTIVITY_BUFFER = 20;
-const SENSITIVE_URL_RE = /bank|pay(?:ment|pal)?|checkout|billing|wallet|finance|credit|transaction|signin|login|auth/i;
+const SENSITIVE_URL_RE = /\b(?:bank|payment|paypal|checkout|billing|wallet|finance|credit|transaction|signin|login|auth)\b/i;
 const SYNTHETIC_KEY = "__vitiate_synthetic__";
 function isSynthetic(evt) {
   return evt[SYNTHETIC_KEY] === true;
