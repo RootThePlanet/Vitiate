@@ -762,13 +762,25 @@ function attachPromptSanitization(): void {
   });
 
   observer.observe(document.documentElement ?? document.body, { childList: true, subtree: true });
+
+  // Also cover inputs that already exist at startup.
+  const initialRoot = document.documentElement ?? document.body;
+  if (initialRoot instanceof HTMLElement) {
+    attachInputWatcher(initialRoot);
+  }
 }
 
 function attachInputWatcher(root: HTMLElement): void {
   const targets: HTMLElement[] = [
-    ...root.querySelectorAll<HTMLElement>("textarea, [contenteditable='true']"),
+    ...root.querySelectorAll<HTMLElement>(
+      "textarea, input[type='text'], input[type='search'], input[type='email'], input[type='tel'], [contenteditable='true']",
+    ),
   ];
-  if (root.matches("textarea") || root.getAttribute("contenteditable") === "true") {
+  if (
+    root.matches("textarea") ||
+    root.matches("input[type='text'], input[type='search'], input[type='email'], input[type='tel']") ||
+    root.getAttribute("contenteditable") === "true"
+  ) {
     targets.push(root);
   }
 
