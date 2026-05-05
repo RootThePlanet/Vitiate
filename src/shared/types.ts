@@ -240,7 +240,9 @@ export type VitiateMessage =
   | { type: "EXPORT_SNAPSHOT" }
   | { type: "SNAPSHOT_RESPONSE"; snapshot: DiagnosticsSnapshot }
   | { type: "GET_MODULE_COUNTERS" }
-  | { type: "MODULE_COUNTERS_RESPONSE"; counters: Record<ModuleId, ModuleCounter> };
+  | { type: "MODULE_COUNTERS_RESPONSE"; counters: Record<ModuleId, ModuleCounter> }
+  | { type: "ACK" }
+  | { type: "ERROR"; message: string };
 
 // ------------------------------------------------------------------ //
 //  Factory functions                                                  //

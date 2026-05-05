@@ -78,115 +78,133 @@ extensionApi.runtime.onMessage.addListener(
   }
 );
 async function handleMessage(msg, _sender, sendResponse) {
-  switch (msg.type) {
-    /* ── settings ──────────────────────────────────────────────── */
-    case "GET_SETTINGS": {
-      const settings = await loadSettings();
-      const domainEnabled = isDomainEnabled(settings, msg.domain);
-      const policyReason = getPolicyReason(settings, msg.domain);
-      const effectivePolicy = getEffectiveModulePolicy(settings, msg.domain);
-      sendResponse({ type: "SETTINGS_RESPONSE", settings, domainEnabled, policyReason, effectivePolicy });
-      break;
-    }
-    case "UPDATE_SETTINGS": {
-      const current = await loadSettings();
-      const merged = { ...current, ...msg.settings };
-      await saveSettings(merged);
-      await updateBadge();
-      break;
-    }
-    case "UPDATE_MODULE_POLICY": {
-      const settings = await loadSettings();
-      settings.modulePolicy = { ...settings.modulePolicy, ...msg.policy };
-      await saveSettings(settings);
-      break;
-    }
-    case "TOGGLE_DOMAIN": {
-      const settings = await loadSettings();
-      settings.domainOverrides[msg.domain] = msg.enabled;
-      await saveSettings(settings);
-      break;
-    }
-    case "REMOVE_DOMAIN": {
-      const settings = await loadSettings();
-      delete settings.domainOverrides[msg.domain];
-      await saveSettings(settings);
-      break;
-    }
-    /* ── metrics ───────────────────────────────────────────────── */
-    case "GET_METRICS": {
-      const lifetime = await loadLifetimeMetrics();
-      sendResponse({ type: "METRICS_RESPONSE", metrics: sessionMetrics, lifetime, feed: activityFeed });
-      break;
-    }
-    case "REPORT_METRICS": {
-      await applyMetricsDelta(msg.delta);
-      break;
-    }
-    case "REPORT_ACTIVITY": {
-      for (const entry of msg.entries) activityFeed.push(entry);
-      if (activityFeed.length > MAX_FEED) activityFeed = activityFeed.slice(-MAX_FEED);
-      break;
-    }
-    case "RESET_METRICS": {
-      sessionMetrics = defaultMetrics();
-      activityFeed = [];
-      for (const id of Object.keys(moduleCounters)) {
-        moduleCounters[id] = defaultModuleCounter();
+  try {
+    switch (msg.type) {
+      /* ── settings ──────────────────────────────────────────────── */
+      case "GET_SETTINGS": {
+        const settings = await loadSettings();
+        const domainEnabled = isDomainEnabled(settings, msg.domain);
+        const policyReason = getPolicyReason(settings, msg.domain);
+        const effectivePolicy = getEffectiveModulePolicy(settings, msg.domain);
+        sendResponse({ type: "SETTINGS_RESPONSE", settings, domainEnabled, policyReason, effectivePolicy });
+        break;
       }
-      await updateBadge();
-      break;
-    }
-    /* ── v2: module counters + incidents ───────────────────────── */
-    case "REPORT_MODULE_COUNTER": {
-      const c = moduleCounters[msg.module];
-      if (msg.delta.processed) c.processed += msg.delta.processed;
-      if (msg.delta.errors) c.errors += msg.delta.errors;
-      if (msg.delta.skippedRateLimit) c.skippedRateLimit += msg.delta.skippedRateLimit;
-      c.lastActiveMs = Date.now();
-      break;
-    }
-    case "REPORT_INCIDENT": {
-      const existing = incidents.find(
-        (i) => i.domain === msg.incident.domain && i.module === msg.incident.module && i.message === msg.incident.message
-      );
-      if (existing) {
-        existing.count++;
-        existing.time = msg.incident.time;
-      } else {
-        incidents.push({ ...msg.incident, count: 1 });
-        if (incidents.length > MAX_INCIDENTS) incidents = incidents.slice(-MAX_INCIDENTS);
+      case "UPDATE_SETTINGS": {
+        const current = await loadSettings();
+        const merged = { ...current, ...msg.settings };
+        await saveSettings(merged);
+        await updateBadge();
+        sendResponse({ type: "ACK" });
+        break;
       }
-      break;
+      case "UPDATE_MODULE_POLICY": {
+        const settings = await loadSettings();
+        settings.modulePolicy = { ...settings.modulePolicy, ...msg.policy };
+        await saveSettings(settings);
+        sendResponse({ type: "ACK" });
+        break;
+      }
+      case "TOGGLE_DOMAIN": {
+        const settings = await loadSettings();
+        settings.domainOverrides[msg.domain] = msg.enabled;
+        await saveSettings(settings);
+        sendResponse({ type: "ACK" });
+        break;
+      }
+      case "REMOVE_DOMAIN": {
+        const settings = await loadSettings();
+        delete settings.domainOverrides[msg.domain];
+        await saveSettings(settings);
+        sendResponse({ type: "ACK" });
+        break;
+      }
+      /* ── metrics ───────────────────────────────────────────────── */
+      case "GET_METRICS": {
+        const lifetime = await loadLifetimeMetrics();
+        sendResponse({ type: "METRICS_RESPONSE", metrics: sessionMetrics, lifetime, feed: activityFeed });
+        break;
+      }
+      case "REPORT_METRICS": {
+        await applyMetricsDelta(msg.delta);
+        sendResponse({ type: "ACK" });
+        break;
+      }
+      case "REPORT_ACTIVITY": {
+        for (const entry of msg.entries) activityFeed.push(entry);
+        if (activityFeed.length > MAX_FEED) activityFeed = activityFeed.slice(-MAX_FEED);
+        sendResponse({ type: "ACK" });
+        break;
+      }
+      case "RESET_METRICS": {
+        sessionMetrics = defaultMetrics();
+        activityFeed = [];
+        for (const id of Object.keys(moduleCounters)) {
+          moduleCounters[id] = defaultModuleCounter();
+        }
+        await updateBadge();
+        sendResponse({ type: "ACK" });
+        break;
+      }
+      /* ── v2: module counters + incidents ───────────────────────── */
+      case "REPORT_MODULE_COUNTER": {
+        const c = moduleCounters[msg.module];
+        if (msg.delta.processed) c.processed += msg.delta.processed;
+        if (msg.delta.errors) c.errors += msg.delta.errors;
+        if (msg.delta.skippedRateLimit) c.skippedRateLimit += msg.delta.skippedRateLimit;
+        c.lastActiveMs = Date.now();
+        sendResponse({ type: "ACK" });
+        break;
+      }
+      case "REPORT_INCIDENT": {
+        const existing = incidents.find(
+          (i) => i.domain === msg.incident.domain && i.module === msg.incident.module && i.message === msg.incident.message
+        );
+        if (existing) {
+          existing.count++;
+          existing.time = msg.incident.time;
+        } else {
+          incidents.push({ ...msg.incident, count: 1 });
+          if (incidents.length > MAX_INCIDENTS) incidents = incidents.slice(-MAX_INCIDENTS);
+        }
+        sendResponse({ type: "ACK" });
+        break;
+      }
+      case "GET_HEALTH": {
+        const health = await computeHealth();
+        sendResponse({ type: "HEALTH_RESPONSE", health, incidents: incidents.slice(-20) });
+        break;
+      }
+      case "GET_MODULE_COUNTERS": {
+        sendResponse({ type: "MODULE_COUNTERS_RESPONSE", counters: { ...moduleCounters } });
+        break;
+      }
+      /* ── v2: diagnostics snapshot ──────────────────────────────── */
+      case "EXPORT_SNAPSHOT": {
+        const settings = await loadSettings();
+        const lifetime = await loadLifetimeMetrics();
+        const health = await computeHealth();
+        const snapshot = {
+          vitiateVersion: extensionApi.runtime.getManifest().version,
+          exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          schemaVersion: SCHEMA_VERSION,
+          settings,
+          sessionMetrics,
+          lifetimeMetrics: lifetime,
+          moduleCounters: { ...moduleCounters },
+          incidents: [...incidents],
+          health
+        };
+        sendResponse({ type: "SNAPSHOT_RESPONSE", snapshot });
+        break;
+      }
+      default:
+        sendResponse({ type: "ERROR", message: "Unsupported message type" });
     }
-    case "GET_HEALTH": {
-      const health = await computeHealth();
-      sendResponse({ type: "HEALTH_RESPONSE", health, incidents: incidents.slice(-20) });
-      break;
-    }
-    case "GET_MODULE_COUNTERS": {
-      sendResponse({ type: "MODULE_COUNTERS_RESPONSE", counters: { ...moduleCounters } });
-      break;
-    }
-    /* ── v2: diagnostics snapshot ──────────────────────────────── */
-    case "EXPORT_SNAPSHOT": {
-      const settings = await loadSettings();
-      const lifetime = await loadLifetimeMetrics();
-      const health = await computeHealth();
-      const snapshot = {
-        vitiateVersion: extensionApi.runtime.getManifest().version,
-        exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
-        schemaVersion: SCHEMA_VERSION,
-        settings,
-        sessionMetrics,
-        lifetimeMetrics: lifetime,
-        moduleCounters: { ...moduleCounters },
-        incidents: [...incidents],
-        health
-      };
-      sendResponse({ type: "SNAPSHOT_RESPONSE", snapshot });
-      break;
-    }
+  } catch (err) {
+    sendResponse({
+      type: "ERROR",
+      message: err instanceof Error ? err.message : String(err)
+    });
   }
 }
 extensionApi.commands.onCommand.addListener(async (command) => {
