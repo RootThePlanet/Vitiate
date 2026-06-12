@@ -12,20 +12,38 @@ const moduleCounters = {
   sanitize: defaultModuleCounter()
 };
 async function loadSettings() {
-  const result = await extensionApi.storage.local.get("vitiate_settings");
-  const stored = result.vitiate_settings;
-  if (!stored) return defaultSettings();
-  return migrateSettings(stored);
+  try {
+    const result = await extensionApi.storage.local.get("vitiate_settings");
+    const stored = result.vitiate_settings;
+    if (!stored) return defaultSettings();
+    return migrateSettings(stored);
+  } catch (error) {
+    console.error("Failed to load settings from storage:", error);
+    return defaultSettings();
+  }
 }
 async function saveSettings(settings) {
-  await extensionApi.storage.local.set({ vitiate_settings: settings });
+  try {
+    await extensionApi.storage.local.set({ vitiate_settings: settings });
+  } catch (error) {
+    console.error("Failed to save settings to storage:", error);
+  }
 }
 async function loadLifetimeMetrics() {
-  const result = await extensionApi.storage.local.get("vitiate_lifetime");
-  return result.vitiate_lifetime ?? defaultLifetimeMetrics();
+  try {
+    const result = await extensionApi.storage.local.get("vitiate_lifetime");
+    return result.vitiate_lifetime ?? defaultLifetimeMetrics();
+  } catch (error) {
+    console.error("Failed to load lifetime metrics from storage:", error);
+    return defaultLifetimeMetrics();
+  }
 }
 async function saveLifetimeMetrics(metrics) {
-  await extensionApi.storage.local.set({ vitiate_lifetime: metrics });
+  try {
+    await extensionApi.storage.local.set({ vitiate_lifetime: metrics });
+  } catch (error) {
+    console.error("Failed to save lifetime metrics to storage:", error);
+  }
 }
 const HEALTH_ERROR_THRESHOLD = 10;
 const HEALTH_DEGRADED_THRESHOLD = 100;
