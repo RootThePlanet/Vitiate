@@ -1,4 +1,4 @@
-import { R as RISK_TIER_PRESETS, e as extensionApi, h as formatCompactNumber } from './chunks/extension-api-jx66ihWQ.js';
+import { R as RISK_TIER_PRESETS, e as extensionApi, I as INTENSITY_CONFIGS, h as formatCompactNumber } from './chunks/extension-api-C9YccUW9.js';
 
 true              &&(function polyfill() {
   const relList = document.createElement("link").relList;
@@ -15015,6 +15015,13 @@ const diagContainer = document.getElementById("diag-container");
 const moduleCountersEl = document.getElementById("module-counters");
 const incidentsListEl = document.getElementById("incidents-list");
 const diagEmpty = document.getElementById("diag-empty");
+const advToggleBtn = document.getElementById("adv-toggle-btn");
+const advArrow = document.getElementById("adv-arrow");
+const advContainer = document.getElementById("adv-container");
+const tokenRefillRateInput = document.getElementById("token-refill-rate");
+const tokenBucketMaxInput = document.getElementById("token-bucket-max");
+const customRegexInput = document.getElementById("custom-regex");
+const saveAdvBtn = document.getElementById("save-adv-btn");
 const resetBtn = document.getElementById("reset-btn");
 const exportBtn = document.getElementById("export-btn");
 const chartCanvas = document.getElementById("activity-chart");
@@ -15101,6 +15108,9 @@ async function loadSettings() {
     updateIntensityLabel(response.settings.intensity ?? "medium");
     renderModulePolicy(response.settings.modulePolicy);
     updateActivePreset(response.settings.intensity);
+    tokenRefillRateInput.value = String(response.settings.customTokenRefillRate ?? INTENSITY_CONFIGS[response.settings.intensity ?? "medium"]?.tokenRefillRate ?? 15);
+    tokenBucketMaxInput.value = String(response.settings.customTokenBucketMax ?? INTENSITY_CONFIGS[response.settings.intensity ?? "medium"]?.tokenBucketMax ?? 60);
+    customRegexInput.value = (response.settings.customSanitizationRules ?? []).join("\n");
     renderDomainList(response.settings.domainOverrides);
   }
 }
@@ -15434,6 +15444,37 @@ resetBtn.addEventListener("click", async () => {
   sparkHistory.sanitized = [];
   prevMetrics = { intercepted: 0, poisoned: 0, sanitized: 0 };
   await loadMetrics();
+});
+advToggleBtn.addEventListener("click", () => {
+  const isHidden = advContainer.style.display === "none";
+  advContainer.style.display = isHidden ? "block" : "none";
+  advArrow.textContent = isHidden ? "▲" : "▼";
+});
+saveAdvBtn.addEventListener("click", async () => {
+  const customSanitizationRules = customRegexInput.value.split("\n").map((s) => s.trim()).filter((s) => s.length > 0);
+  let customTokenRefillRate = parseFloat(tokenRefillRateInput.value);
+  let customTokenBucketMax = parseFloat(tokenBucketMaxInput.value);
+  if (customTokenRefillRate < 0.1) customTokenRefillRate = 0.1;
+  if (customTokenRefillRate > 1e3) customTokenRefillRate = 1e3;
+  if (customTokenBucketMax < 1) customTokenBucketMax = 1;
+  if (customTokenBucketMax > 5e3) customTokenBucketMax = 5e3;
+  const newSettings = {
+    customSanitizationRules
+  };
+  if (!isNaN(customTokenRefillRate)) {
+    newSettings.customTokenRefillRate = customTokenRefillRate;
+  }
+  if (!isNaN(customTokenBucketMax)) {
+    newSettings.customTokenBucketMax = customTokenBucketMax;
+  }
+  await send({ type: "UPDATE_SETTINGS", settings: newSettings });
+  const originalText = saveAdvBtn.textContent;
+  saveAdvBtn.textContent = "Saved!";
+  saveAdvBtn.classList.add("bg-emerald-800");
+  setTimeout(() => {
+    saveAdvBtn.textContent = originalText;
+    saveAdvBtn.classList.remove("bg-emerald-800");
+  }, 1500);
 });
 function escapeHtml(str) {
   const div = document.createElement("div");

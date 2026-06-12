@@ -190,6 +190,11 @@ export interface VitiateSettings {
   modulePolicy: ModulePolicy;
   /** Per-domain module policy overrides */
   domainModulePolicy: Record<string, Partial<ModulePolicy>>;
+  /** Custom token bucket config overrides */
+  customTokenRefillRate?: number;
+  customTokenBucketMax?: number;
+  /** Custom sanitization regular expressions */
+  customSanitizationRules: string[];
 }
 
 // ------------------------------------------------------------------ //
@@ -264,6 +269,7 @@ export function defaultSettings(): VitiateSettings {
     intensity: "medium",
     modulePolicy: defaultModulePolicy(),
     domainModulePolicy: {},
+    customSanitizationRules: [],
   };
 }
 
