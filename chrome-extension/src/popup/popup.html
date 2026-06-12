@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vitiate</title>
     <script type="module" crossorigin src="../../popup.js"></script>
-    <link rel="modulepreload" crossorigin href="../../chunks/extension-api-jx66ihWQ.js">
+    <link rel="modulepreload" crossorigin href="../../chunks/extension-api-C9YccUW9.js">
     <link rel="stylesheet" crossorigin href="../../assets/popup.css">
   </head>
   <body class="w-[360px] bg-gray-950 text-gray-100 font-sans">
@@ -174,6 +174,29 @@
       <div id="domains-container" class="domains-container" style="display:none;">
         <div id="domains-list" class="domains-list"></div>
         <p id="domains-empty" class="text-[10px] text-gray-600 text-center py-2">No domain overrides</p>
+      </div>
+    </section>
+
+    <!-- Advanced Config -->
+    <section class="px-4 py-3 border-b border-gray-800">
+      <button id="adv-toggle-btn" class="flex items-center justify-between w-full text-[10px] text-gray-500 uppercase tracking-widest">
+        <span>Advanced Config</span>
+        <span id="adv-arrow" class="feed-arrow">▼</span>
+      </button>
+      <div id="adv-container" class="adv-container mt-2" style="display:none;">
+        <div class="mb-2">
+          <label class="text-[10px] text-gray-500 uppercase">Token Refill Rate (tokens/sec)</label>
+          <input type="number" id="token-refill-rate" class="w-full bg-gray-900 border border-gray-700 text-xs px-2 py-1 mt-1 rounded text-white" />
+        </div>
+        <div class="mb-2">
+          <label class="text-[10px] text-gray-500 uppercase">Token Bucket Max (tokens)</label>
+          <input type="number" id="token-bucket-max" class="w-full bg-gray-900 border border-gray-700 text-xs px-2 py-1 mt-1 rounded text-white" />
+        </div>
+        <div class="mb-2">
+          <label class="text-[10px] text-gray-500 uppercase">Custom Sanitization Rules (Regex per line)</label>
+          <textarea id="custom-regex" class="w-full bg-gray-900 border border-gray-700 text-xs px-2 py-1 mt-1 rounded text-white font-mono" rows="3" placeholder="^corp-.*"></textarea>
+        </div>
+        <button id="save-adv-btn" class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1 rounded w-full transition-colors">Save Advanced Config</button>
       </div>
     </section>
 

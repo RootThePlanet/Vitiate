@@ -362,3 +362,23 @@ extensionApi.runtime.onInstalled.addListener(async () => {
   }
   await updateBadge();
 });
+
+extensionApi.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (changeInfo.status === "loading" && tab.url) {
+    try {
+      const url = new URL(tab.url);
+      if (url.protocol !== "http:" && url.protocol !== "https:") return;
+
+      const settings = await loadSettings();
+      if (isDomainEnabled(settings, url.hostname)) {
+        await extensionApi.scripting.executeScript({
+          target: { tabId, allFrames: true },
+          files: ["content.js"],
+          injectImmediately: true,
+        });
+      }
+    } catch (e) {
+      console.error("Failed to inject content script", e);
+    }
+  }
+});

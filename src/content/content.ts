@@ -38,6 +38,13 @@ import {
 } from "../shared/types";
 import { extensionApi } from "../shared/extension-api";
 
+// Injection guard
+if ((window as any).__vitiate_injected__) {
+  console.warn("Vitiate already injected.");
+  throw new Error("Vitiate already injected");
+}
+(window as any).__vitiate_injected__ = true;
+
 /* ================================================================== */
 /*  Configuration constants                                            */
 /* ================================================================== */
@@ -141,19 +148,47 @@ function randGaussian(mean: number, std: number): number {
 
 const tokenBucket = {
   tokens:      0,
-  lastRefillMs: 0,
+  lastRefillMs: Date.now(),
 };
 
-function consumeToken(): boolean {
-  const nowMs    = Date.now();
-  const elapsed  = (nowMs - tokenBucket.lastRefillMs) / 1000;
-  const config   = intensityConfig;
+let refillTimerId: number | NodeJS.Timeout | null = null;
+let usingIdleCallback = typeof requestIdleCallback !== "undefined";
+
+function refillTokensIdle(deadline?: IdleDeadline): void {
+  const nowMs = Date.now();
+  const elapsed = (nowMs - tokenBucket.lastRefillMs) / 1000;
+  const config = intensityConfig;
   tokenBucket.tokens = Math.min(
     config.tokenBucketMax,
     tokenBucket.tokens + elapsed * config.tokenRefillRate,
   );
   tokenBucket.lastRefillMs = nowMs;
 
+  if (usingIdleCallback) {
+    refillTimerId = requestIdleCallback(refillTokensIdle, { timeout: 1000 });
+  } else {
+    refillTimerId = setTimeout(refillTokensIdle, 1000);
+  }
+}
+
+if (usingIdleCallback) {
+  refillTimerId = requestIdleCallback(refillTokensIdle, { timeout: 1000 });
+} else {
+  refillTimerId = setTimeout(refillTokensIdle, 1000);
+}
+
+// Cleanup on disable/unload if needed
+function stopRefillingTokens() {
+  if (refillTimerId !== null) {
+    if (usingIdleCallback && typeof cancelIdleCallback !== "undefined") {
+      cancelIdleCallback(refillTimerId as number);
+    } else {
+      clearTimeout(refillTimerId as NodeJS.Timeout);
+    }
+  }
+}
+
+function consumeToken(): boolean {
   if (tokenBucket.tokens >= 1) {
     tokenBucket.tokens -= 1;
     return true;
@@ -302,6 +337,9 @@ function applyFingerprintModule(): void {
 
   try {
     poisonCanvasFingerprint(fpBundle.canvasNoiseSeed);
+    poisonAudioFingerprint(fpBundle.canvasNoiseSeed);
+    poisonClientRects(fpBundle.canvasNoiseSeed);
+    poisonMeasureText(fpBundle.canvasNoiseSeed);
     spoofNavigatorAndScreen(fpBundle);
     trackSuccess("fingerprint");
   } catch (err) {
@@ -397,6 +435,106 @@ function poisonCanvasFingerprint(noiseSeed: number): void {
   try { poisonWebGL(WebGL2RenderingContext.prototype); } catch { /* WebGL2 unavailable */ }
 }
 
+/** Inject deterministic noise into AudioBuffer and DynamicsCompressor outputs. */
+function poisonAudioFingerprint(noiseSeed: number): void {
+  if (typeof AudioBuffer !== "undefined" && AudioBuffer.prototype.getChannelData) {
+    const origGetChannelData = AudioBuffer.prototype.getChannelData;
+    AudioBuffer.prototype.getChannelData = function (channel: number): Float32Array {
+      const originalData = origGetChannelData.call(this, channel);
+      if (!engineEnabled || !effectivePolicy.fingerprint) return originalData;
+      // Inject deterministic noise, but copy first
+      const data = new Float32Array(originalData);
+      for (let i = 0; i < data.length; i += 100) {
+        data[i] += (noiseSeed % 100) * 0.0000001;
+      }
+      return data;
+    };
+  }
+
+  if (typeof BaseAudioContext !== "undefined" && BaseAudioContext.prototype.createDynamicsCompressor) {
+    const origCreateCompressor = BaseAudioContext.prototype.createDynamicsCompressor;
+    BaseAudioContext.prototype.createDynamicsCompressor = function () {
+      const compressor = origCreateCompressor.apply(this, arguments as any);
+      if (!engineEnabled || !effectivePolicy.fingerprint) return compressor;
+      // Mutate properties slightly
+      if (compressor.threshold && compressor.threshold.value) {
+        compressor.threshold.value += (noiseSeed % 100) * 0.0001;
+      }
+      return compressor;
+    };
+  }
+}
+
+/** Intercept getBoundingClientRect and getClientRects to apply sub-pixel jitter. */
+function poisonClientRects(noiseSeed: number): void {
+  const origGetBoundingClientRect = Element.prototype.getBoundingClientRect;
+  Element.prototype.getBoundingClientRect = function () {
+    const rect = origGetBoundingClientRect.call(this);
+    if (!engineEnabled || !effectivePolicy.fingerprint) return rect;
+    const jitter = ((noiseSeed % 10) / 100);
+    return new DOMRect(
+      rect.x + jitter,
+      rect.y + jitter,
+      rect.width + jitter,
+      rect.height + jitter
+    );
+  };
+
+  const origGetClientRects = Element.prototype.getClientRects;
+  Element.prototype.getClientRects = function () {
+    const rects = origGetClientRects.call(this);
+    if (!engineEnabled || !effectivePolicy.fingerprint) return rects;
+    const jitter = ((noiseSeed % 10) / 100);
+    const modifiedRects = [];
+    for (let i = 0; i < rects.length; i++) {
+      const rect = rects[i];
+      modifiedRects.push(new DOMRect(
+        rect.x + jitter,
+        rect.y + jitter,
+        rect.width + jitter,
+        rect.height + jitter
+      ));
+    }
+    // Return something that acts like a DOMRectList
+    const modifiedRectsArray = modifiedRects;
+    const result = {
+      length: modifiedRects.length,
+      item: function(index: number) { return modifiedRectsArray[index] || null; },
+      [Symbol.iterator]: function* () { yield* modifiedRectsArray; }
+    };
+    for (let i = 0; i < modifiedRects.length; i++) {
+      (result as any)[i] = modifiedRects[i];
+    }
+    
+    // Assign correct prototype
+    if (typeof DOMRectList !== "undefined") {
+      Object.setPrototypeOf(result, DOMRectList.prototype);
+    }
+    
+    return result as unknown as DOMRectList;
+  };
+}
+
+/** Fuzz CanvasRenderingContext2D.measureText to obscure the local font stack. */
+function poisonMeasureText(noiseSeed: number): void {
+  const origMeasureText = CanvasRenderingContext2D.prototype.measureText;
+  CanvasRenderingContext2D.prototype.measureText = function (text: string) {
+    const metrics = origMeasureText.call(this, text);
+    if (!engineEnabled || !effectivePolicy.fingerprint) return metrics;
+    const jitter = ((noiseSeed % 10) / 100);
+    // Return proxy since TextMetrics properties are read-only
+    return new Proxy(metrics, {
+      get(target, prop) {
+        const val = Reflect.get(target, prop);
+        if (typeof val === "number") {
+          return val + jitter;
+        }
+        return val;
+      }
+    });
+  };
+}
+
 /** Override navigator / screen properties with bundle values. */
 function spoofNavigatorAndScreen(bundle: FingerprintBundle): void {
   const def = (obj: object, prop: string, value: unknown) => {
@@ -438,14 +576,34 @@ function setWrapped(l: AnyListener, t: string, w: EventListener): void {
 }
 
 /**
- * Mutate keyboard event timestamps to disrupt inter-keystroke timing analysis.
+ * Mutate event timestamps and apply debouncing/velocity smoothing to disrupt timing analysis.
  * Returns a Proxy so the original event object is never mutated.
  */
-function maybeMutateTimestamp(evt: Event): Event {
-  if (!effectivePolicy.intercept) return evt;
-  if (evt.type !== "keydown" && evt.type !== "keyup") return evt;
+let lastScrollTime = 0;
+let scrollDampening = 0;
 
-  const jitter = randFloat(-intensityConfig.jitterMs, intensityConfig.jitterMs);
+function obfuscateEventTimestamp(evt: Event): Event {
+  if (!effectivePolicy.intercept) return evt;
+  
+  let jitter = 0;
+  if (evt.type === "keydown" || evt.type === "keyup") {
+    jitter = randFloat(-intensityConfig.jitterMs, intensityConfig.jitterMs);
+  } else if (evt.type === "scroll") {
+    // Artificial acceleration / dampening
+    const now = Date.now();
+    const dt = now - lastScrollTime;
+    lastScrollTime = now;
+    if (dt < 50) {
+      scrollDampening += 1;
+    } else {
+      scrollDampening = 0;
+    }
+    // Dampening factor varies between -intensityConfig.jitterMs and +intensityConfig.jitterMs
+    jitter = Math.sin(scrollDampening * 0.5) * intensityConfig.jitterMs * 2;
+  } else {
+    return evt;
+  }
+
   return new Proxy(evt, {
     get(target, prop) {
       if (prop === "timeStamp") return Math.max(0, target.timeStamp + jitter);
@@ -481,7 +639,31 @@ function patchAddEventListener(proto: EventTarget): void {
         pendingIntercepted++;
         trackSuccess("intercept");
 
-        const mutated = maybeMutateTimestamp(evt);
+        const mutated = obfuscateEventTimestamp(evt);
+        
+        if (evt.type === "keydown" || evt.type === "keyup") {
+          // Delaying execution for keystrokes to break biometric typing cadences in JS listeners.
+          // Native browser behavior is untouched because we do not prevent propagation.
+          const delay = Math.abs(randFloat(1, intensityConfig.jitterMs));
+          setTimeout(() => {
+            if (typeof listener === "function") listener(mutated);
+            else listener.handleEvent(mutated);
+          }, delay);
+          return;
+        }
+
+        // Scroll Velocity Smoothing
+        if (evt.type === "scroll") {
+          const delay = Math.abs(Math.cos(scrollDampening * 0.5) * intensityConfig.jitterMs);
+          if (delay > 1) {
+            setTimeout(() => {
+              if (typeof listener === "function") listener(mutated);
+              else listener.handleEvent(mutated);
+            }, delay);
+            return;
+          }
+        }
+
         if (typeof listener === "function") listener(mutated);
         else listener.handleEvent(mutated);
       };
@@ -516,9 +698,8 @@ patchAddEventListener(Element.prototype);
 /* ================================================================== */
 
 /**
- * Generate synthetic mouse events along a smooth arc toward a randomised
- * offset target.  Uses ease-in-out interpolation + Gaussian jitter so the
- * arc looks more like a real hand movement than a straight line.
+ * Generate synthetic mouse events along a multi-point Bezier curve toward a randomised
+ * offset target. This provides organic mouse trajectories indistinguishable from complex human movements.
  */
 function generateMouseArc(base: MouseEvent, count: number): MouseEvent[] {
   const events: MouseEvent[] = [];
@@ -526,12 +707,33 @@ function generateMouseArc(base: MouseEvent, count: number): MouseEvent[] {
   const targetX = base.clientX + Math.round(randGaussian(0, off / 2));
   const targetY = base.clientY + Math.round(randGaussian(0, off / 2));
 
+  // Multi-point Bezier curve control points
+  const cp1X = base.clientX + Math.round(randGaussian(0, off));
+  const cp1Y = base.clientY + Math.round(randGaussian(0, off));
+  const cp2X = targetX + Math.round(randGaussian(0, off));
+  const cp2Y = targetY + Math.round(randGaussian(0, off));
+
   for (let i = 0; i < count; i++) {
     const t      = (i + 1) / (count + 1);
-    // Cubic ease-in-out: accelerate from 0→0.5, decelerate from 0.5→1
+    // Cubic ease-in-out
     const eased  = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    const x      = Math.round(base.clientX + (targetX - base.clientX) * eased + randGaussian(0, 2));
-    const y      = Math.round(base.clientY + (targetY - base.clientY) * eased + randGaussian(0, 2));
+    
+    const mt = 1 - eased;
+    const x = Math.round(
+      mt * mt * mt * base.clientX +
+      3 * mt * mt * eased * cp1X +
+      3 * mt * eased * eased * cp2X +
+      eased * eased * eased * targetX +
+      randGaussian(0, 2)
+    );
+    const y = Math.round(
+      mt * mt * mt * base.clientY +
+      3 * mt * mt * eased * cp1Y +
+      3 * mt * eased * eased * cp2Y +
+      eased * eased * eased * targetY +
+      randGaussian(0, 2)
+    );
+
     const evt    = new MouseEvent("mousemove", {
       clientX:   x,
       clientY:   y,
@@ -694,6 +896,8 @@ function attachEventDelegation(): void {
 /*  Module 4 — Sanitization: PII redaction                            */
 /* ================================================================== */
 
+let customSanitizationRegexes: RegExp[] = [];
+
 const PII_PATTERNS: { pattern: RegExp; replacement: string }[] = [
   { pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, replacement: "[email redacted]" },
   { pattern: /(\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{4}/g, replacement: "[phone redacted]" },
@@ -711,6 +915,13 @@ function sanitizeText(text: string): { sanitized: string; changed: boolean } {
   let changed = false;
   for (const { pattern, replacement } of PII_PATTERNS) {
     const newResult = result.replace(pattern, replacement);
+    if (newResult !== result) {
+      changed = true;
+      result = newResult;
+    }
+  }
+  for (const pattern of customSanitizationRegexes) {
+    const newResult = result.replace(pattern, "[custom redacted]");
     if (newResult !== result) {
       changed = true;
       result = newResult;
@@ -887,8 +1098,33 @@ async function init(): Promise<void> {
     if (response?.type === "SETTINGS_RESPONSE") {
       engineEnabled     = response.domainEnabled;
       currentIntensity  = response.settings.intensity ?? "medium";
-      intensityConfig   = INTENSITY_CONFIGS[currentIntensity];
+      intensityConfig   = { ...INTENSITY_CONFIGS[currentIntensity] };
+      
+      if (response.settings.customTokenRefillRate !== undefined) {
+        intensityConfig.tokenRefillRate = response.settings.customTokenRefillRate;
+      }
+      if (response.settings.customTokenBucketMax !== undefined) {
+        intensityConfig.tokenBucketMax = response.settings.customTokenBucketMax;
+      }
+
       effectivePolicy   = response.effectivePolicy ?? effectivePolicy;
+      if (response.settings.customSanitizationRules) {
+        customSanitizationRegexes = [];
+        for (const rule of response.settings.customSanitizationRules) {
+          try {
+            // Very simple validation to avoid obvious ReDoS issues.
+            // Not foolproof, but better than nothing for client-side evaluation.
+            // Avoid repeated groups containing quantifiers, using non-greedy match to avoid capturing out of bounds.
+            if (!/(\([^)]*\+[^)]*\)|\([^)]*\*[^)]*\)|\([^)]*\?[^)]*\)){2,}/.test(rule)) {
+               customSanitizationRegexes.push(new RegExp(rule, 'g'));
+            } else {
+               console.warn("Vitiate: Skipped complex regex for sanitization rule:", rule);
+            }
+          } catch (e) {
+            console.warn("Vitiate: Invalid custom sanitization regex:", rule);
+          }
+        }
+      }
     }
   } catch {
     // First run or extension context invalid — use defaults
@@ -916,4 +1152,5 @@ async function init(): Promise<void> {
   setInterval(flushMetrics, METRICS_FLUSH_MS);
 }
 
+// Remove double guard (already handled at top of file)
 init();

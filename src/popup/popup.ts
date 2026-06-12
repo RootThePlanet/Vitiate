@@ -32,6 +32,7 @@ import {
   type DiagnosticsSnapshot,
   formatCompactNumber,
   RISK_TIER_PRESETS,
+  INTENSITY_CONFIGS,
 } from "../shared/types";
 import { extensionApi } from "../shared/extension-api";
 
@@ -105,6 +106,15 @@ const diagContainer  = document.getElementById("diag-container")   as HTMLElemen
 const moduleCountersEl = document.getElementById("module-counters") as HTMLElement;
 const incidentsListEl  = document.getElementById("incidents-list")  as HTMLElement;
 const diagEmpty        = document.getElementById("diag-empty")      as HTMLElement;
+
+// Advanced config
+const advToggleBtn  = document.getElementById("adv-toggle-btn")  as HTMLElement;
+const advArrow      = document.getElementById("adv-arrow")       as HTMLElement;
+const advContainer  = document.getElementById("adv-container")   as HTMLElement;
+const tokenRefillRateInput = document.getElementById("token-refill-rate") as HTMLInputElement;
+const tokenBucketMaxInput = document.getElementById("token-bucket-max") as HTMLInputElement;
+const customRegexInput = document.getElementById("custom-regex") as HTMLTextAreaElement;
+const saveAdvBtn = document.getElementById("save-adv-btn") as HTMLButtonElement;
 
 const resetBtn  = document.getElementById("reset-btn")  as HTMLElement;
 const exportBtn = document.getElementById("export-btn") as HTMLElement;
@@ -222,6 +232,11 @@ async function loadSettings(): Promise<void> {
     // Module toggles
     renderModulePolicy(response.settings.modulePolicy);
     updateActivePreset(response.settings.intensity);
+
+    // Advanced config
+    tokenRefillRateInput.value = String(response.settings.customTokenRefillRate ?? INTENSITY_CONFIGS[response.settings.intensity ?? "medium"]?.tokenRefillRate ?? 15);
+    tokenBucketMaxInput.value = String(response.settings.customTokenBucketMax ?? INTENSITY_CONFIGS[response.settings.intensity ?? "medium"]?.tokenBucketMax ?? 60);
+    customRegexInput.value = (response.settings.customSanitizationRules ?? []).join('\n');
 
     // Domain list
     renderDomainList(response.settings.domainOverrides);
@@ -672,6 +687,50 @@ resetBtn.addEventListener("click", async () => {
   sparkHistory.sanitized   = [];
   prevMetrics = { intercepted: 0, poisoned: 0, sanitized: 0 };
   await loadMetrics();
+});
+
+advToggleBtn.addEventListener("click", () => {
+  const isHidden = advContainer.style.display === "none";
+  advContainer.style.display = isHidden ? "block" : "none";
+  advArrow.textContent       = isHidden ? "▲" : "▼";
+});
+
+saveAdvBtn.addEventListener("click", async () => {
+  const customSanitizationRules = customRegexInput.value
+    .split('\n')
+    .map(s => s.trim())
+    .filter(s => s.length > 0);
+
+  let customTokenRefillRate = parseFloat(tokenRefillRateInput.value);
+  let customTokenBucketMax = parseFloat(tokenBucketMaxInput.value);
+
+  // Validate bounds to prevent ridiculous rate limiting
+  if (customTokenRefillRate < 0.1) customTokenRefillRate = 0.1;
+  if (customTokenRefillRate > 1000) customTokenRefillRate = 1000;
+  if (customTokenBucketMax < 1) customTokenBucketMax = 1;
+  if (customTokenBucketMax > 5000) customTokenBucketMax = 5000;
+
+  const newSettings: Partial<VitiateSettings> = {
+    customSanitizationRules
+  };
+
+  if (!isNaN(customTokenRefillRate)) {
+    newSettings.customTokenRefillRate = customTokenRefillRate;
+  }
+  if (!isNaN(customTokenBucketMax)) {
+    newSettings.customTokenBucketMax = customTokenBucketMax;
+  }
+
+  await send({ type: "UPDATE_SETTINGS", settings: newSettings });
+  
+  // Provide visual feedback
+  const originalText = saveAdvBtn.textContent;
+  saveAdvBtn.textContent = "Saved!";
+  saveAdvBtn.classList.add("bg-emerald-800");
+  setTimeout(() => {
+    saveAdvBtn.textContent = originalText;
+    saveAdvBtn.classList.remove("bg-emerald-800");
+  }, 1500);
 });
 
 /* ================================================================== */

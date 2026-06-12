@@ -25,7 +25,8 @@ function defaultSettings() {
     domainOverrides: {},
     intensity: "medium",
     modulePolicy: defaultModulePolicy(),
-    domainModulePolicy: {}
+    domainModulePolicy: {},
+    customSanitizationRules: []
   };
 }
 function defaultMetrics() {
@@ -89,6 +90,11 @@ const extensionApi = globalWithBrowser.browser ?? chrome;
 
 
 
+if (window.__vitiate_injected__) {
+  console.warn("Vitiate already injected.");
+  throw new Error("Vitiate already injected");
+}
+window.__vitiate_injected__ = true;
 const TRACKED_EVENTS = [
   "mousemove",
   "click",
@@ -151,9 +157,10 @@ function randGaussian(mean, std) {
 }
 const tokenBucket = {
   tokens: 0,
-  lastRefillMs: 0
+  lastRefillMs: Date.now()
 };
-function consumeToken() {
+let usingIdleCallback = typeof requestIdleCallback !== "undefined";
+function refillTokensIdle(deadline) {
   const nowMs = Date.now();
   const elapsed = (nowMs - tokenBucket.lastRefillMs) / 1e3;
   const config = intensityConfig;
@@ -162,6 +169,18 @@ function consumeToken() {
     tokenBucket.tokens + elapsed * config.tokenRefillRate
   );
   tokenBucket.lastRefillMs = nowMs;
+  if (usingIdleCallback) {
+    requestIdleCallback(refillTokensIdle, { timeout: 1e3 });
+  } else {
+    setTimeout(refillTokensIdle, 1e3);
+  }
+}
+if (usingIdleCallback) {
+  requestIdleCallback(refillTokensIdle, { timeout: 1e3 });
+} else {
+  setTimeout(refillTokensIdle, 1e3);
+}
+function consumeToken() {
   if (tokenBucket.tokens >= 1) {
     tokenBucket.tokens -= 1;
     return true;
@@ -270,6 +289,9 @@ function applyFingerprintModule() {
   if (!effectivePolicy.fingerprint) return;
   try {
     poisonCanvasFingerprint(fpBundle.canvasNoiseSeed);
+    poisonAudioFingerprint(fpBundle.canvasNoiseSeed);
+    poisonClientRects(fpBundle.canvasNoiseSeed);
+    poisonMeasureText(fpBundle.canvasNoiseSeed);
     spoofNavigatorAndScreen(fpBundle);
     trackSuccess("fingerprint");
   } catch (err) {
@@ -354,6 +376,95 @@ function poisonCanvasFingerprint(noiseSeed) {
   } catch {
   }
 }
+function poisonAudioFingerprint(noiseSeed) {
+  if (typeof AudioBuffer !== "undefined" && AudioBuffer.prototype.getChannelData) {
+    const origGetChannelData = AudioBuffer.prototype.getChannelData;
+    AudioBuffer.prototype.getChannelData = function(channel) {
+      const originalData = origGetChannelData.call(this, channel);
+      if (!engineEnabled || !effectivePolicy.fingerprint) return originalData;
+      const data = new Float32Array(originalData);
+      for (let i = 0; i < data.length; i += 100) {
+        data[i] += noiseSeed % 100 * 1e-7;
+      }
+      return data;
+    };
+  }
+  if (typeof BaseAudioContext !== "undefined" && BaseAudioContext.prototype.createDynamicsCompressor) {
+    const origCreateCompressor = BaseAudioContext.prototype.createDynamicsCompressor;
+    BaseAudioContext.prototype.createDynamicsCompressor = function() {
+      const compressor = origCreateCompressor.apply(this, arguments);
+      if (!engineEnabled || !effectivePolicy.fingerprint) return compressor;
+      if (compressor.threshold && compressor.threshold.value) {
+        compressor.threshold.value += noiseSeed % 100 * 1e-4;
+      }
+      return compressor;
+    };
+  }
+}
+function poisonClientRects(noiseSeed) {
+  const origGetBoundingClientRect = Element.prototype.getBoundingClientRect;
+  Element.prototype.getBoundingClientRect = function() {
+    const rect = origGetBoundingClientRect.call(this);
+    if (!engineEnabled || !effectivePolicy.fingerprint) return rect;
+    const jitter = noiseSeed % 10 / 100;
+    return new DOMRect(
+      rect.x + jitter,
+      rect.y + jitter,
+      rect.width + jitter,
+      rect.height + jitter
+    );
+  };
+  const origGetClientRects = Element.prototype.getClientRects;
+  Element.prototype.getClientRects = function() {
+    const rects = origGetClientRects.call(this);
+    if (!engineEnabled || !effectivePolicy.fingerprint) return rects;
+    const jitter = noiseSeed % 10 / 100;
+    const modifiedRects = [];
+    for (let i = 0; i < rects.length; i++) {
+      const rect = rects[i];
+      modifiedRects.push(new DOMRect(
+        rect.x + jitter,
+        rect.y + jitter,
+        rect.width + jitter,
+        rect.height + jitter
+      ));
+    }
+    const modifiedRectsArray = modifiedRects;
+    const result = {
+      length: modifiedRects.length,
+      item: function(index) {
+        return modifiedRectsArray[index] || null;
+      },
+      [Symbol.iterator]: function* () {
+        yield* modifiedRectsArray;
+      }
+    };
+    for (let i = 0; i < modifiedRects.length; i++) {
+      result[i] = modifiedRects[i];
+    }
+    if (typeof DOMRectList !== "undefined") {
+      Object.setPrototypeOf(result, DOMRectList.prototype);
+    }
+    return result;
+  };
+}
+function poisonMeasureText(noiseSeed) {
+  const origMeasureText = CanvasRenderingContext2D.prototype.measureText;
+  CanvasRenderingContext2D.prototype.measureText = function(text) {
+    const metrics = origMeasureText.call(this, text);
+    if (!engineEnabled || !effectivePolicy.fingerprint) return metrics;
+    const jitter = noiseSeed % 10 / 100;
+    return new Proxy(metrics, {
+      get(target, prop) {
+        const val = Reflect.get(target, prop);
+        if (typeof val === "number") {
+          return val + jitter;
+        }
+        return val;
+      }
+    });
+  };
+}
 function spoofNavigatorAndScreen(bundle) {
   const def = (obj, prop, value) => {
     try {
@@ -383,10 +494,26 @@ function setWrapped(l, t, w) {
   }
   inner.set(t, w);
 }
-function maybeMutateTimestamp(evt) {
+let lastScrollTime = 0;
+let scrollDampening = 0;
+function obfuscateEventTimestamp(evt) {
   if (!effectivePolicy.intercept) return evt;
-  if (evt.type !== "keydown" && evt.type !== "keyup") return evt;
-  const jitter = randFloat(-intensityConfig.jitterMs, intensityConfig.jitterMs);
+  let jitter = 0;
+  if (evt.type === "keydown" || evt.type === "keyup") {
+    jitter = randFloat(-intensityConfig.jitterMs, intensityConfig.jitterMs);
+  } else if (evt.type === "scroll") {
+    const now = Date.now();
+    const dt = now - lastScrollTime;
+    lastScrollTime = now;
+    if (dt < 50) {
+      scrollDampening += 1;
+    } else {
+      scrollDampening = 0;
+    }
+    jitter = Math.sin(scrollDampening * 0.5) * intensityConfig.jitterMs * 2;
+  } else {
+    return evt;
+  }
   return new Proxy(evt, {
     get(target, prop) {
       if (prop === "timeStamp") return Math.max(0, target.timeStamp + jitter);
@@ -412,7 +539,25 @@ function patchAddEventListener(proto) {
         }
         pendingIntercepted++;
         trackSuccess("intercept");
-        const mutated = maybeMutateTimestamp(evt);
+        const mutated = obfuscateEventTimestamp(evt);
+        if (evt.type === "keydown" || evt.type === "keyup") {
+          const delay = Math.abs(randFloat(1, intensityConfig.jitterMs));
+          setTimeout(() => {
+            if (typeof listener === "function") listener(mutated);
+            else listener.handleEvent(mutated);
+          }, delay);
+          return;
+        }
+        if (evt.type === "scroll") {
+          const delay = Math.abs(Math.cos(scrollDampening * 0.5) * intensityConfig.jitterMs);
+          if (delay > 1) {
+            setTimeout(() => {
+              if (typeof listener === "function") listener(mutated);
+              else listener.handleEvent(mutated);
+            }, delay);
+            return;
+          }
+        }
         if (typeof listener === "function") listener(mutated);
         else listener.handleEvent(mutated);
       };
@@ -438,11 +583,20 @@ function generateMouseArc(base, count) {
   const off = intensityConfig.mouseOffset;
   const targetX = base.clientX + Math.round(randGaussian(0, off / 2));
   const targetY = base.clientY + Math.round(randGaussian(0, off / 2));
+  const cp1X = base.clientX + Math.round(randGaussian(0, off));
+  const cp1Y = base.clientY + Math.round(randGaussian(0, off));
+  const cp2X = targetX + Math.round(randGaussian(0, off));
+  const cp2Y = targetY + Math.round(randGaussian(0, off));
   for (let i = 0; i < count; i++) {
     const t = (i + 1) / (count + 1);
     const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    const x = Math.round(base.clientX + (targetX - base.clientX) * eased + randGaussian(0, 2));
-    const y = Math.round(base.clientY + (targetY - base.clientY) * eased + randGaussian(0, 2));
+    const mt = 1 - eased;
+    const x = Math.round(
+      mt * mt * mt * base.clientX + 3 * mt * mt * eased * cp1X + 3 * mt * eased * eased * cp2X + eased * eased * eased * targetX + randGaussian(0, 2)
+    );
+    const y = Math.round(
+      mt * mt * mt * base.clientY + 3 * mt * mt * eased * cp1Y + 3 * mt * eased * eased * cp2Y + eased * eased * eased * targetY + randGaussian(0, 2)
+    );
     const evt = new MouseEvent("mousemove", {
       clientX: x,
       clientY: y,
@@ -575,6 +729,7 @@ function attachEventDelegation() {
     );
   }
 }
+let customSanitizationRegexes = [];
 const PII_PATTERNS = [
   { pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, replacement: "[email redacted]" },
   { pattern: /(\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{4}/g, replacement: "[phone redacted]" },
@@ -591,6 +746,13 @@ function sanitizeText(text) {
   let changed = false;
   for (const { pattern, replacement } of PII_PATTERNS) {
     const newResult = result.replace(pattern, replacement);
+    if (newResult !== result) {
+      changed = true;
+      result = newResult;
+    }
+  }
+  for (const pattern of customSanitizationRegexes) {
+    const newResult = result.replace(pattern, "[custom redacted]");
     if (newResult !== result) {
       changed = true;
       result = newResult;
@@ -735,8 +897,28 @@ async function init() {
     if (response?.type === "SETTINGS_RESPONSE") {
       engineEnabled = response.domainEnabled;
       currentIntensity = response.settings.intensity ?? "medium";
-      intensityConfig = INTENSITY_CONFIGS[currentIntensity];
+      intensityConfig = { ...INTENSITY_CONFIGS[currentIntensity] };
+      if (response.settings.customTokenRefillRate !== void 0) {
+        intensityConfig.tokenRefillRate = response.settings.customTokenRefillRate;
+      }
+      if (response.settings.customTokenBucketMax !== void 0) {
+        intensityConfig.tokenBucketMax = response.settings.customTokenBucketMax;
+      }
       effectivePolicy = response.effectivePolicy ?? effectivePolicy;
+      if (response.settings.customSanitizationRules) {
+        customSanitizationRegexes = [];
+        for (const rule of response.settings.customSanitizationRules) {
+          try {
+            if (!/(\([^)]*\+[^)]*\)|\([^)]*\*[^)]*\)|\([^)]*\?[^)]*\)){2,}/.test(rule)) {
+              customSanitizationRegexes.push(new RegExp(rule, "g"));
+            } else {
+              console.warn("Vitiate: Skipped complex regex for sanitization rule:", rule);
+            }
+          } catch (e) {
+            console.warn("Vitiate: Invalid custom sanitization regex:", rule);
+          }
+        }
+      }
     }
   } catch {
     engineEnabled = true;

@@ -24,7 +24,8 @@ function defaultSettings() {
     domainOverrides: {},
     intensity: "medium",
     modulePolicy: defaultModulePolicy(),
-    domainModulePolicy: {}
+    domainModulePolicy: {},
+    customSanitizationRules: []
   };
 }
 function defaultMetrics() {
