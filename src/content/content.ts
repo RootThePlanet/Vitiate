@@ -119,6 +119,7 @@ function xorshift128plus(): number {
 }
 
 function randInt(min: number, max: number): number {
+  if (max < min) throw new Error("Invalid range");
   return min + Math.floor(xorshift128plus() * (max - min + 1));
 }
 
@@ -146,9 +147,10 @@ const tokenBucket = {
 function consumeToken(): boolean {
   const nowMs    = Date.now();
   const elapsed  = (nowMs - tokenBucket.lastRefillMs) / 1000;
+  const config   = intensityConfig;
   tokenBucket.tokens = Math.min(
-    intensityConfig.tokenBucketMax,
-    tokenBucket.tokens + elapsed * intensityConfig.tokenRefillRate,
+    config.tokenBucketMax,
+    tokenBucket.tokens + elapsed * config.tokenRefillRate,
   );
   tokenBucket.lastRefillMs = nowMs;
 
@@ -497,7 +499,9 @@ function patchAddEventListener(proto: EventTarget): void {
     if (!listener || !trackedSet.has(type)) {
       return origRemove.call(this, type, listener, options);
     }
-    const w = getWrapped(listener, type) ?? listener;
+    const inner = wrapperRegistry.get(listener);
+    const w = inner?.get(type) ?? listener;
+    inner?.delete(type);
     return origRemove.call(this, type, w, options);
   };
 }
@@ -591,7 +595,7 @@ const syntheticQueue: Event[] = [];
 let flushScheduled = false;
 
 function scheduleSyntheticFlush(): void {
-  if (flushScheduled) return;
+  if (flushScheduled || syntheticQueue.length === 0) return;
   flushScheduled = true;
   if (typeof requestIdleCallback !== "undefined") {
     requestIdleCallback(flushSyntheticQueue, { timeout: 50 });
@@ -601,15 +605,19 @@ function scheduleSyntheticFlush(): void {
 }
 
 function flushSyntheticQueue(): void {
-  flushScheduled = false;
   const target = document.documentElement ?? document.body;
-  if (!target) return;
+  if (!target) {
+    flushScheduled = false;
+    return;
+  }
 
   while (syntheticQueue.length > 0) {
     try {
       target.dispatchEvent(syntheticQueue.shift()!);
     } catch { /* swallow errors from synthetic dispatch */ }
   }
+  
+  flushScheduled = false;
 }
 
 function enqueueSynthetics(evt: Event): void {
@@ -687,7 +695,7 @@ function attachEventDelegation(): void {
 /* ================================================================== */
 
 const PII_PATTERNS: { pattern: RegExp; replacement: string }[] = [
-  { pattern: /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g, replacement: "[email redacted]" },
+  { pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, replacement: "[email redacted]" },
   { pattern: /(\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{4}/g, replacement: "[phone redacted]" },
   { pattern: /\b\d{3}-\d{2}-\d{4}\b/g, replacement: "[SSN redacted]" },
   { pattern: /\b(?:\d{4}[-\s]?){3}\d{4}\b/g, replacement: "[card redacted]" },
@@ -702,11 +710,10 @@ function sanitizeText(text: string): { sanitized: string; changed: boolean } {
   let result  = text;
   let changed = false;
   for (const { pattern, replacement } of PII_PATTERNS) {
-    pattern.lastIndex = 0;
-    if (pattern.test(result)) {
+    const newResult = result.replace(pattern, replacement);
+    if (newResult !== result) {
       changed = true;
-      pattern.lastIndex = 0;
-      result  = result.replace(pattern, replacement);
+      result = newResult;
     }
   }
   return { sanitized: result, changed };

@@ -67,14 +67,23 @@ const moduleCounters: Record<ModuleId, ModuleCounter> = {
 /* ------------------------------------------------------------------ */
 
 async function loadSettings(): Promise<VitiateSettings> {
-  const result = await extensionApi.storage.local.get("vitiate_settings");
-  const stored = result.vitiate_settings as Record<string, unknown> | undefined;
-  if (!stored) return defaultSettings();
-  return migrateSettings(stored);
+  try {
+    const result = await extensionApi.storage.local.get("vitiate_settings");
+    const stored = result.vitiate_settings as Record<string, unknown> | undefined;
+    if (!stored) return defaultSettings();
+    return migrateSettings(stored);
+  } catch (error) {
+    console.error("Failed to load settings from storage:", error);
+    return defaultSettings();
+  }
 }
 
 async function saveSettings(settings: VitiateSettings): Promise<void> {
-  await extensionApi.storage.local.set({ vitiate_settings: settings });
+  try {
+    await extensionApi.storage.local.set({ vitiate_settings: settings });
+  } catch (error) {
+    console.error("Failed to save settings to storage:", error);
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -82,12 +91,21 @@ async function saveSettings(settings: VitiateSettings): Promise<void> {
 /* ------------------------------------------------------------------ */
 
 async function loadLifetimeMetrics(): Promise<LifetimeMetrics> {
-  const result = await extensionApi.storage.local.get("vitiate_lifetime");
-  return (result.vitiate_lifetime as LifetimeMetrics) ?? defaultLifetimeMetrics();
+  try {
+    const result = await extensionApi.storage.local.get("vitiate_lifetime");
+    return (result.vitiate_lifetime as LifetimeMetrics) ?? defaultLifetimeMetrics();
+  } catch (error) {
+    console.error("Failed to load lifetime metrics from storage:", error);
+    return defaultLifetimeMetrics();
+  }
 }
 
 async function saveLifetimeMetrics(metrics: LifetimeMetrics): Promise<void> {
-  await extensionApi.storage.local.set({ vitiate_lifetime: metrics });
+  try {
+    await extensionApi.storage.local.set({ vitiate_lifetime: metrics });
+  } catch (error) {
+    console.error("Failed to save lifetime metrics to storage:", error);
+  }
 }
 
 /* ------------------------------------------------------------------ */

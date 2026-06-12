@@ -137,6 +137,7 @@ function xorshift128plus() {
   return (_s0 + _s1 >>> 0) / 4294967296;
 }
 function randInt(min, max) {
+  if (max < min) throw new Error("Invalid range");
   return min + Math.floor(xorshift128plus() * (max - min + 1));
 }
 function randFloat(min, max) {
@@ -155,9 +156,10 @@ const tokenBucket = {
 function consumeToken() {
   const nowMs = Date.now();
   const elapsed = (nowMs - tokenBucket.lastRefillMs) / 1e3;
+  const config = intensityConfig;
   tokenBucket.tokens = Math.min(
-    intensityConfig.tokenBucketMax,
-    tokenBucket.tokens + elapsed * intensityConfig.tokenRefillRate
+    config.tokenBucketMax,
+    tokenBucket.tokens + elapsed * config.tokenRefillRate
   );
   tokenBucket.lastRefillMs = nowMs;
   if (tokenBucket.tokens >= 1) {
@@ -422,7 +424,9 @@ function patchAddEventListener(proto) {
     if (!listener || !trackedSet.has(type)) {
       return origRemove.call(this, type, listener, options);
     }
-    const w = getWrapped(listener, type) ?? listener;
+    const inner = wrapperRegistry.get(listener);
+    const w = inner?.get(type) ?? listener;
+    inner?.delete(type);
     return origRemove.call(this, type, w, options);
   };
 }
@@ -488,7 +492,7 @@ function generateSyntheticScroll() {
 const syntheticQueue = [];
 let flushScheduled = false;
 function scheduleSyntheticFlush() {
-  if (flushScheduled) return;
+  if (flushScheduled || syntheticQueue.length === 0) return;
   flushScheduled = true;
   if (typeof requestIdleCallback !== "undefined") {
     requestIdleCallback(flushSyntheticQueue, { timeout: 50 });
@@ -497,15 +501,18 @@ function scheduleSyntheticFlush() {
   }
 }
 function flushSyntheticQueue() {
-  flushScheduled = false;
   const target = document.documentElement ?? document.body;
-  if (!target) return;
+  if (!target) {
+    flushScheduled = false;
+    return;
+  }
   while (syntheticQueue.length > 0) {
     try {
       target.dispatchEvent(syntheticQueue.shift());
     } catch {
     }
   }
+  flushScheduled = false;
 }
 function enqueueSynthetics(evt) {
   if (!engineEnabled || !effectivePolicy.poison) return;
@@ -569,7 +576,7 @@ function attachEventDelegation() {
   }
 }
 const PII_PATTERNS = [
-  { pattern: /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g, replacement: "[email redacted]" },
+  { pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, replacement: "[email redacted]" },
   { pattern: /(\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{4}/g, replacement: "[phone redacted]" },
   { pattern: /\b\d{3}-\d{2}-\d{4}\b/g, replacement: "[SSN redacted]" },
   { pattern: /\b(?:\d{4}[-\s]?){3}\d{4}\b/g, replacement: "[card redacted]" },
@@ -583,11 +590,10 @@ function sanitizeText(text) {
   let result = text;
   let changed = false;
   for (const { pattern, replacement } of PII_PATTERNS) {
-    pattern.lastIndex = 0;
-    if (pattern.test(result)) {
+    const newResult = result.replace(pattern, replacement);
+    if (newResult !== result) {
       changed = true;
-      pattern.lastIndex = 0;
-      result = result.replace(pattern, replacement);
+      result = newResult;
     }
   }
   return { sanitized: result, changed };
