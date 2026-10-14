@@ -1,10 +1,10 @@
 (function () {
 const SCHEMA_VERSION = 2;
 const INTENSITY_CONFIGS = {
-  low: { minSynthetic: 1, maxSynthetic: 2, jitterMs: 5, mouseOffset: 30, clickOffset: 10, tokenRefillRate: 5, tokenBucketMax: 30 },
-  medium: { minSynthetic: 3, maxSynthetic: 5, jitterMs: 15, mouseOffset: 80, clickOffset: 30, tokenRefillRate: 15, tokenBucketMax: 60 },
-  high: { minSynthetic: 6, maxSynthetic: 12, jitterMs: 30, mouseOffset: 150, clickOffset: 60, tokenRefillRate: 30, tokenBucketMax: 100 },
-  paranoid: { minSynthetic: 15, maxSynthetic: 20, jitterMs: 50, mouseOffset: 250, clickOffset: 100, tokenRefillRate: 50, tokenBucketMax: 150 }
+  low: { minSynthetic: 1, maxSynthetic: 1, jitterMs: 4, mouseOffset: 24, clickOffset: 8, tokenRefillRate: 5, tokenBucketMax: 30 },
+  medium: { minSynthetic: 1, maxSynthetic: 2, jitterMs: 12, mouseOffset: 48, clickOffset: 16, tokenRefillRate: 15, tokenBucketMax: 60 },
+  high: { minSynthetic: 1, maxSynthetic: 3, jitterMs: 24, mouseOffset: 80, clickOffset: 24, tokenRefillRate: 30, tokenBucketMax: 100 },
+  paranoid: { minSynthetic: 2, maxSynthetic: 4, jitterMs: 40, mouseOffset: 120, clickOffset: 36, tokenRefillRate: 50, tokenBucketMax: 150 }
 };
 const RISK_TIER_PRESETS = {
   low: { intercept: true, poison: false, fingerprint: true, sanitize: true },
@@ -25,7 +25,8 @@ function defaultSettings() {
     domainOverrides: {},
     intensity: "medium",
     modulePolicy: defaultModulePolicy(),
-    domainModulePolicy: {}
+    domainModulePolicy: {},
+    customSanitizationRules: []
   };
 }
 function defaultMetrics() {
@@ -83,9 +84,13 @@ function formatCompactNumber(n) {
   if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`;
   return n.toString();
 }
+const PAGE_BRIDGE_CHANNEL = "vitiate-bridge-v3";
+
 
 const globalWithBrowser = globalThis;
 const extensionApi = globalWithBrowser.browser ?? chrome;
+
+
 
 
 
@@ -101,20 +106,97 @@ const moduleCounters = {
   sanitize: defaultModuleCounter()
 };
 async function loadSettings() {
-  const result = await extensionApi.storage.local.get("vitiate_settings");
-  const stored = result.vitiate_settings;
-  if (!stored) return defaultSettings();
-  return migrateSettings(stored);
+  try {
+    const result = await extensionApi.storage.local.get("vitiate_settings");
+    const stored = result.vitiate_settings;
+    if (!stored) return defaultSettings();
+    return migrateSettings(stored);
+  } catch (error) {
+    console.error("Failed to load settings from storage:", error);
+    return defaultSettings();
+  }
 }
 async function saveSettings(settings) {
-  await extensionApi.storage.local.set({ vitiate_settings: settings });
+  try {
+    await extensionApi.storage.local.set({ vitiate_settings: settings });
+  } catch (error) {
+    console.error("Failed to save settings to storage:", error);
+  }
+  await syncClientHintRule();
+}
+const CLIENT_HINT_RULE_ID = 1001;
+const CLIENT_HINT_HEADERS = [
+  "sec-ch-ua-arch",
+  "sec-ch-ua-bitness",
+  "sec-ch-ua-full-version",
+  "sec-ch-ua-full-version-list",
+  "sec-ch-ua-model",
+  "sec-ch-ua-platform-version",
+  "sec-ch-ua-wow64",
+  "sec-ch-ua-form-factors"
+];
+async function syncClientHintRule() {
+  const dnr = extensionApi.declarativeNetRequest;
+  if (!dnr?.updateDynamicRules) return;
+  try {
+    const settings = await loadSettings();
+    const enabled = settings.enabled && settings.modulePolicy.fingerprint;
+    const excluded = /* @__PURE__ */ new Set();
+    for (const [domain, on] of Object.entries(settings.domainOverrides)) {
+      if (!on) excluded.add(domain);
+    }
+    for (const [domain, policy] of Object.entries(settings.domainModulePolicy)) {
+      if (policy.fingerprint === false) excluded.add(domain);
+    }
+    const excludedInitiatorDomains = [...excluded].filter(Boolean).slice(0, 50);
+    const addRules = enabled ? [{
+      id: CLIENT_HINT_RULE_ID,
+      priority: 1,
+      action: {
+        type: "modifyHeaders",
+        requestHeaders: CLIENT_HINT_HEADERS.map((header) => ({
+          header,
+          operation: "remove"
+        }))
+      },
+      condition: {
+        urlFilter: "*",
+        resourceTypes: [
+          "main_frame",
+          "sub_frame",
+          "xmlhttprequest",
+          "script",
+          "image",
+          "font",
+          "stylesheet",
+          "media",
+          "ping",
+          "websocket",
+          "other"
+        ],
+        ...excludedInitiatorDomains.length > 0 ? { excludedInitiatorDomains } : {}
+      }
+    }] : [];
+    await dnr.updateDynamicRules({ removeRuleIds: [CLIENT_HINT_RULE_ID], addRules });
+  } catch (error) {
+    console.error("Failed to sync client-hint rule:", error);
+  }
 }
 async function loadLifetimeMetrics() {
-  const result = await extensionApi.storage.local.get("vitiate_lifetime");
-  return result.vitiate_lifetime ?? defaultLifetimeMetrics();
+  try {
+    const result = await extensionApi.storage.local.get("vitiate_lifetime");
+    return result.vitiate_lifetime ?? defaultLifetimeMetrics();
+  } catch (error) {
+    console.error("Failed to load lifetime metrics from storage:", error);
+    return defaultLifetimeMetrics();
+  }
 }
 async function saveLifetimeMetrics(metrics) {
-  await extensionApi.storage.local.set({ vitiate_lifetime: metrics });
+  try {
+    await extensionApi.storage.local.set({ vitiate_lifetime: metrics });
+  } catch (error) {
+    console.error("Failed to save lifetime metrics to storage:", error);
+  }
 }
 const HEALTH_ERROR_THRESHOLD = 10;
 const HEALTH_DEGRADED_THRESHOLD = 100;
@@ -313,6 +395,9 @@ extensionApi.runtime.onInstalled.addListener(async () => {
     await saveSettings(migrated);
   }
   await updateBadge();
+});
+extensionApi.runtime.onStartup.addListener(() => {
+  void syncClientHintRule();
 });
 
 })();

@@ -1,9 +1,9 @@
 const SCHEMA_VERSION = 2;
 const INTENSITY_CONFIGS = {
-  low: { minSynthetic: 1, maxSynthetic: 2, jitterMs: 5, mouseOffset: 30, clickOffset: 10, tokenRefillRate: 5, tokenBucketMax: 30 },
-  medium: { minSynthetic: 3, maxSynthetic: 5, jitterMs: 15, mouseOffset: 80, clickOffset: 30, tokenRefillRate: 15, tokenBucketMax: 60 },
-  high: { minSynthetic: 6, maxSynthetic: 12, jitterMs: 30, mouseOffset: 150, clickOffset: 60, tokenRefillRate: 30, tokenBucketMax: 100 },
-  paranoid: { minSynthetic: 15, maxSynthetic: 20, jitterMs: 50, mouseOffset: 250, clickOffset: 100, tokenRefillRate: 50, tokenBucketMax: 150 }
+  low: { minSynthetic: 1, maxSynthetic: 1, jitterMs: 4, mouseOffset: 24, clickOffset: 8, tokenRefillRate: 5, tokenBucketMax: 30 },
+  medium: { minSynthetic: 1, maxSynthetic: 2, jitterMs: 12, mouseOffset: 48, clickOffset: 16, tokenRefillRate: 15, tokenBucketMax: 60 },
+  high: { minSynthetic: 1, maxSynthetic: 3, jitterMs: 24, mouseOffset: 80, clickOffset: 24, tokenRefillRate: 30, tokenBucketMax: 100 },
+  paranoid: { minSynthetic: 2, maxSynthetic: 4, jitterMs: 40, mouseOffset: 120, clickOffset: 36, tokenRefillRate: 50, tokenBucketMax: 150 }
 };
 const RISK_TIER_PRESETS = {
   low: { intercept: true, poison: false, fingerprint: true, sanitize: true },
@@ -24,7 +24,8 @@ function defaultSettings() {
     domainOverrides: {},
     intensity: "medium",
     modulePolicy: defaultModulePolicy(),
-    domainModulePolicy: {}
+    domainModulePolicy: {},
+    customSanitizationRules: []
   };
 }
 function defaultMetrics() {
@@ -82,8 +83,6 @@ function formatCompactNumber(n) {
   if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`;
   return n.toString();
 }
+const PAGE_BRIDGE_CHANNEL = "vitiate-bridge-v3";
 
-const globalWithBrowser = globalThis;
-const extensionApi = globalWithBrowser.browser ?? chrome;
-
-export { INTENSITY_CONFIGS as I, RISK_TIER_PRESETS as R, SCHEMA_VERSION as S, defaultModuleCounter as a, getEffectiveModulePolicy as b, defaultSettings as c, defaultMetrics as d, extensionApi as e, defaultLifetimeMetrics as f, getPolicyReason as g, formatCompactNumber as h, isDomainEnabled as i, migrateSettings as m };
+export { INTENSITY_CONFIGS as I, PAGE_BRIDGE_CHANNEL as P, RISK_TIER_PRESETS as R, SCHEMA_VERSION as S, defaultModuleCounter as a, getEffectiveModulePolicy as b, defaultSettings as c, defaultMetrics as d, defaultLifetimeMetrics as e, formatCompactNumber as f, getPolicyReason as g, isDomainEnabled as i, migrateSettings as m };

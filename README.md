@@ -1,27 +1,40 @@
 ![Vitiate](./public/marquee/vitiate.png)
 
-Vitiate is a Manifest V3 browser extension that poisons behavioral telemetry and reduces biometric signal quality for automated scraping systems.
+Vitiate is a Manifest V3 browser extension that raises the cost of behavioral profiling. It runs fully locally and gives you per-domain control over how aggressive that should be.
 
-It runs fully locally, adds controlled noise to event streams, and gives you per-domain control over how aggressive the protection should be.
+> Vitiate is one layer in a privacy posture. It does not guarantee anonymity, and it does not defeat bot managers that require `isTrusted` events.
 
-> Vitiate is built to raise the cost of behavioral profiling — not to guarantee anonymity.
+Reviewed against browser and tracker behavior as of October 2026.
 
 ## What it does
 
-- Intercepts high-signal browser events (`mousemove`, `click`, `keydown`, `keyup`, `scroll`, `submit`)
-- Injects synthetic noise events with intensity-aware profiles
-- Obfuscates keystroke timing fingerprints
-- Sanitizes likely PII patterns in form and paste flows
-- Poisons common canvas / WebGL fingerprinting paths
-- Spoofs select navigator/screen fingerprinting properties
+- Jitters timestamps on real `keydown`, `keyup`, `beforeinput`, `pointerdown`, `click`, and `wheel` events without delaying the listeners or reordering them
+- Injects a small amount of **untrusted** pointer/mouse noise for naive heatmaps that never check `isTrusted`
+- Adds session-stable, low-bit noise to canvas, OffscreenCanvas, WebGL `readPixels`, and audio readbacks (`getChannelData` and `copyFromChannel`)
+- Collapses unmasked WebGL and WebGPU adapter strings onto the browser's already-masked GPU identity, and strips high-entropy UA client hints
+- Redacts likely PII in outbound telemetry payloads (including common first-party collector paths such as `/g/collect`) without rewriting form submits
+- Blocks current third-party behavioral collectors (GA4, product analytics, session replay) without blocking their product dashboards or error monitors such as Sentry
 - Tracks session + lifetime metrics in a live popup dashboard
+
+## What it no longer does
+
+These were accurate a few years ago and are counterproductive now:
+
+- Spoofing `navigator.platform`, languages, screen size, `deviceMemory`, or a fake `"Generic Renderer"`. Anti-bot scripts compare those to `userAgentData`, media queries, and WebGPU and treat the mismatch as the signal.
+- Dispatching synthetic clicks, keystrokes, or scrolls. They are `isTrusted: false`, current bot managers ignore them, and bubbling fakes can activate real handlers.
+- Delaying key and scroll listeners. That desyncs callback time from `timeStamp` and breaks IMEs.
+- Rewriting form fields and paste text. That corrupted the request the user meant to send.
+- Blocking whole vendor domains (`mixpanel.com`, `sentry.io`) or Universal Analytics-only endpoints.
+
+Defenses run in the page **MAIN** world at `document_start`. An isolated content script cannot patch the prototypes page scripts actually call. Firefox 128+ is required for MAIN-world content scripts.
 
 ## Architecture
 
 | Module | File | Responsibility |
 |---|---|---|
-| Background Service Worker | `src/background/background.ts` | Settings persistence, metrics aggregation, message routing, badge state |
-| Content Script | `src/content/content.ts` | Event interception, poisoning engine, sanitization, fingerprint defenses |
+| Background Service Worker | `src/background/background.ts` | Settings persistence, metrics aggregation, message routing, badge state, client-hint rule |
+| Isolated bridge | `src/content/content.ts` | Settings and metrics relay. Does not patch the page. |
+| Page-world defenses | `src/content/page-world.ts` | MAIN-world interception, pointer noise, fingerprint readback noise, telemetry redaction |
 | Popup UI | `src/popup/popup.ts` | Runtime controls, metrics rendering, activity feed, domain management |
 | Shared Types | `src/shared/types.ts` | Cross-module contracts and defaults |
 
@@ -39,7 +52,8 @@ Vitiate/
 │   ├── background/
 │   │   └── background.ts
 │   ├── content/
-│   │   └── content.ts
+│   │   ├── content.ts
+│   │   └── page-world.ts
 │   ├── popup/
 │   │   ├── popup.html
 │   │   ├── popup.css
@@ -67,11 +81,20 @@ Then:
 3. Click **Load unpacked**
 4. Select the `chrome-extension/` directory
 
-Firefox:
+Firefox 128 or newer:
 
 1. Open `about:debugging#/runtime/this-firefox`
 2. Click **Load Temporary Add-on**
 3. Select `firefox-extension/manifest.json`
+
+## Limits (October 2026)
+
+- Synthetic events cannot be `isTrusted`. Bot managers from Cloudflare, DataDome, HUMAN, and Akamai ignore them. Poisoning is for naive collectors only.
+- Prototype hooks are visible via `Function.prototype.toString`. That can raise a bot score. Turn modules off if a site starts challenging you.
+- Worker-created canvases are not patched. Fingerprinters that hash a canvas inside a Worker bypass readback noise.
+- First-party collectors on unknown paths are not blocked. Known paths (`/g/collect`, `/cdn-cgi/rum`, Matomo) are redacted, not universally blocked.
+- Client-hint stripping follows the global fingerprint toggle. Static tracker blocks stay on.
+- Do not expect this to replace a browser's own fingerprint resistance (Brave, Firefox RFP) or a separate content blocker.
 
 ## Security and runtime constraints
 

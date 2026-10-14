@@ -46,7 +46,7 @@ function iifeBundlePlugin(entries: string[]): Plugin {
 
         // Strip `import { … } from '…';` lines from the entry
         const entryCode = entry.code.replace(
-          /^import\s*\{[^}]*\}\s*from\s*['"][^'"]*['"];?\s*$/gm,
+          /import\s*\{[\s\S]*?\}\s*from\s*['"][^'"]*['"];?/g,
           "",
         );
 
@@ -71,6 +71,7 @@ export default defineConfig(({ mode }) => {
         input: {
           background: resolve(__dirname, "src/background/background.ts"),
           content: resolve(__dirname, "src/content/content.ts"),
+          "page-world": resolve(__dirname, "src/content/page-world.ts"),
           popup: resolve(__dirname, "src/popup/popup.html"),
         },
         output: {
@@ -78,7 +79,7 @@ export default defineConfig(({ mode }) => {
           chunkFileNames: "chunks/[name]-[hash].js",
           assetFileNames: "assets/[name][extname]",
         },
-        plugins: [iifeBundlePlugin(isFirefoxBuild ? ["content.js", "background.js"] : ["content.js"])],
+        plugins: [iifeBundlePlugin(isFirefoxBuild ? ["content.js", "background.js", "page-world.js"] : ["content.js", "page-world.js"])],
       },
       target: "esnext",
       minify: false,
