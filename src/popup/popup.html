@@ -19,7 +19,7 @@
           </svg>
         </div>
         <span class="text-lg font-bold tracking-tight text-emerald-400">Vitiate</span>
-        <span class="text-[10px] text-gray-500 uppercase tracking-widest">v1.2</span>
+        <span id="ext-version" class="text-[10px] text-gray-500 uppercase tracking-widest"></span>
         <!-- Health indicator -->
         <span class="health-dot" id="health-dot" title="Engine health"></span>
         <span class="text-[10px] health-text" id="health-text">—</span>
@@ -61,22 +61,22 @@
     <section class="px-4 py-3 border-b border-gray-800">
       <p class="text-[10px] text-gray-500 uppercase mb-2">Active Defenses</p>
       <div class="module-grid">
-        <label class="module-toggle-item" title="Event interception &amp; timestamp jitter">
+        <label class="module-toggle-item" title="Order-preserving timestamp jitter on real events">
           <input type="checkbox" id="mod-intercept" class="sr-only" checked />
           <span class="module-dot" id="dot-intercept"></span>
           <span class="module-label">Intercept</span>
         </label>
-        <label class="module-toggle-item" title="Synthetic event injection">
+        <label class="module-toggle-item" title="Untrusted pointer noise for naive heatmaps. Does not forge isTrusted.">
           <input type="checkbox" id="mod-poison" class="sr-only" checked />
           <span class="module-dot" id="dot-poison"></span>
           <span class="module-label">Poison</span>
         </label>
-        <label class="module-toggle-item" title="Canvas / WebGL / Navigator spoofing">
+        <label class="module-toggle-item" title="Canvas, audio, and WebGL readback noise plus reduced client hints">
           <input type="checkbox" id="mod-fingerprint" class="sr-only" checked />
           <span class="module-dot" id="dot-fingerprint"></span>
           <span class="module-label">Fingerprint</span>
         </label>
-        <label class="module-toggle-item" title="PII sanitization in forms &amp; paste">
+        <label class="module-toggle-item" title="Redact PII in outbound telemetry payloads. Does not change form submits.">
           <input type="checkbox" id="mod-sanitize" class="sr-only" checked />
           <span class="module-dot" id="dot-sanitize"></span>
           <span class="module-label">Sanitize</span>
@@ -191,8 +191,8 @@
           <input type="number" id="token-bucket-max" class="w-full bg-gray-900 border border-gray-700 text-xs px-2 py-1 mt-1 rounded text-white" />
         </div>
         <div class="mb-2">
-          <label class="text-[10px] text-gray-500 uppercase">Custom Sanitization Rules (Regex per line)</label>
-          <textarea id="custom-regex" class="w-full bg-gray-900 border border-gray-700 text-xs px-2 py-1 mt-1 rounded text-white font-mono" rows="3" placeholder="^corp-.*"></textarea>
+          <label class="text-[10px] text-gray-500 uppercase">Telemetry redaction rules (regex per line)</label>
+          <textarea id="custom-regex" class="w-full bg-gray-900 border border-gray-700 text-xs px-2 py-1 mt-1 rounded text-white font-mono" rows="3" placeholder="employee-id-\d+"></textarea>
         </div>
         <button id="save-adv-btn" class="text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1 rounded w-full transition-colors">Save Advanced Config</button>
       </div>

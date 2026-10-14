@@ -1,8 +1,8 @@
 # Vitiate — Privacy Policy
 
 **Applies to:** Vitiate for Google Chrome and Mozilla Firefox  
-**Extension version:** 1.2.0 and later  
-**Last updated:** 2026-04-27
+**Extension version:** 1.3.0 and later  
+**Last updated:** 2026-10-14
 
 ---
 
@@ -35,7 +35,8 @@ Vitiate requires the following browser permissions to function:
 |---|---|
 | `activeTab` | Identify the current domain so per-site protection settings can be applied. |
 | `storage` | Persist your settings and cumulative metrics locally on your device. |
-| `host_permissions: <all_urls>` | Inject the content script on any page so behavioral telemetry can be intercepted and poisoned. |
+| `declarativeNetRequest` | Block known third-party behavioral collectors and, when the fingerprint module is on, remove high-entropy client-hint request headers. Vitiate does not read those headers. |
+| `host_permissions: <all_urls>` | Inject the defense script on any page so behavioral telemetry can be intercepted and poisoned. |
 
 ---
 
@@ -45,8 +46,8 @@ Vitiate uses `chrome.storage.local` (Chrome) and `browser.storage.local` (Firefo
 
 | Key | Contents |
 |---|---|
-| `vitiate_settings` | Your preferences: global on/off toggle, per-domain overrides, intensity level, and module policy. |
-| `vitiate_lifetime` | Cumulative counters: total intercepted events, synthetic events injected, and sanitized inputs. These are aggregate numbers only — no event content is stored. |
+| `vitiate_settings` | Your preferences: global on/off toggle, per-domain overrides, intensity level, module policy, and custom telemetry redaction patterns. |
+| `vitiate_lifetime` | Cumulative counters: total intercepted events, synthetic events injected, and redacted telemetry payloads. These are aggregate numbers only — no event content is stored. |
 
 This data never leaves your device. You can clear it at any time by removing the extension or using your browser's extension storage tools.
 
@@ -56,12 +57,12 @@ This data never leaves your device. You can clear it at any time by removing the
 
 To protect you from behavioral profiling, Vitiate modifies how the browser reports certain signals **within the page** (not outside it):
 
-- **Event interception** — Intercepts `mousemove`, `click`, `keydown`, `keyup`, `scroll`, and `submit` events and adds timing jitter before they reach tracking scripts.
-- **Synthetic event injection** — Injects artificial noise events to make behavioral fingerprints less reliable.
-- **Fingerprint spoofing** — Overrides canvas, WebGL, `navigator`, and `screen` properties with coherent but fictitious values to disrupt device fingerprinting.
-- **PII sanitization** — Detects likely PII patterns (e.g. email addresses, phone numbers) in form fields and paste flows and replaces them with plausible synthetic data before they are read by tracking scripts.
+- **Event interception** — Jitters timestamps on real `keydown`, `keyup`, `beforeinput`, `pointerdown`, `click`, and `wheel` events seen by page scripts. Listeners are not delayed, and form values are not changed.
+- **Pointer noise** — Injects a small number of untrusted pointer and mouse-move events. These cannot be marked trusted. Clicks, keystrokes, and scrolls are not synthesized.
+- **Fingerprint readback noise** — Adds low-bit, session-stable noise to canvas, OffscreenCanvas, WebGL pixel reads, and audio buffer reads. Unmasked GPU strings are collapsed to the browser's own masked values. High-entropy client hints are omitted. Platform, language, and screen size are not spoofed.
+- **Telemetry redaction** — Likely PII patterns in requests to known collectors (and common first-party collector paths) are replaced in memory before the request is sent. The text you submit in forms is not rewritten.
 
-None of this data is read by Vitiate for its own purposes; the extension modifies these signals in-page to protect you and then discards them.
+None of this data is stored by Vitiate. Request bodies are inspected only long enough to redact a telemetry payload, then discarded.
 
 ---
 

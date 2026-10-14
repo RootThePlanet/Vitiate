@@ -22,14 +22,20 @@ export const SCHEMA_VERSION = 2;
 //  Core scalar types                                                  //
 // ------------------------------------------------------------------ //
 
-/** Tracked behavioral event categories */
+/**
+ * Behavioral events still worth touching in 2026.
+ * `pointermove` is poisoned (not delayed). Discrete events are timestamp-jittered.
+ * `wheel` replaced `scroll` because scroll events carry no delta.
+ * `beforeinput` covers IME and mobile typing cadences that keydown misses.
+ */
 export type TrackedEventType =
-  | "mousemove"
+  | "pointermove"
+  | "pointerdown"
   | "click"
   | "keydown"
   | "keyup"
-  | "scroll"
-  | "submit";
+  | "beforeinput"
+  | "wheel";
 
 /** Poisoning intensity levels */
 export type IntensityLevel = "low" | "medium" | "high" | "paranoid";
@@ -53,13 +59,16 @@ export type PolicyReason =
 
 /** Per-module enablement policy for the defense pipeline */
 export interface ModulePolicy {
-  /** Event interception and timestamp jitter */
+  /** Order-preserving timestamp jitter on real, trusted events */
   intercept: boolean;
-  /** Synthetic event injection */
+  /** Low-volume synthetic pointer noise for naive heatmaps */
   poison: boolean;
-  /** Canvas / WebGL / Navigator / Screen spoofing */
+  /**
+   * Consistent readback noise and reduced client hints.
+   * Does not spoof platform, screen, or language — those lies are detected.
+   */
   fingerprint: boolean;
-  /** PII sanitization in forms and paste flows */
+  /** PII redaction in outbound telemetry payloads (not in form submits) */
   sanitize: boolean;
 }
 
@@ -89,11 +98,15 @@ export interface IntensityConfig {
 }
 
 /** Map each intensity level to its config */
+/**
+ * Synthetic counts stay low on purpose. A burst of untrusted events is itself
+ * a bot signal in 2026, and click/key injection can activate real page handlers.
+ */
 export const INTENSITY_CONFIGS: Record<IntensityLevel, IntensityConfig> = {
-  low:      { minSynthetic: 1,  maxSynthetic: 2,  jitterMs: 5,  mouseOffset: 30,  clickOffset: 10,  tokenRefillRate: 5,  tokenBucketMax: 30  },
-  medium:   { minSynthetic: 3,  maxSynthetic: 5,  jitterMs: 15, mouseOffset: 80,  clickOffset: 30,  tokenRefillRate: 15, tokenBucketMax: 60  },
-  high:     { minSynthetic: 6,  maxSynthetic: 12, jitterMs: 30, mouseOffset: 150, clickOffset: 60,  tokenRefillRate: 30, tokenBucketMax: 100 },
-  paranoid: { minSynthetic: 15, maxSynthetic: 20, jitterMs: 50, mouseOffset: 250, clickOffset: 100, tokenRefillRate: 50, tokenBucketMax: 150 },
+  low:      { minSynthetic: 1, maxSynthetic: 1, jitterMs: 4,  mouseOffset: 24,  clickOffset: 8,  tokenRefillRate: 5,  tokenBucketMax: 30  },
+  medium:   { minSynthetic: 1, maxSynthetic: 2, jitterMs: 12, mouseOffset: 48,  clickOffset: 16, tokenRefillRate: 15, tokenBucketMax: 60  },
+  high:     { minSynthetic: 1, maxSynthetic: 3, jitterMs: 24, mouseOffset: 80,  clickOffset: 24, tokenRefillRate: 30, tokenBucketMax: 100 },
+  paranoid: { minSynthetic: 2, maxSynthetic: 4, jitterMs: 40, mouseOffset: 120, clickOffset: 36, tokenRefillRate: 50, tokenBucketMax: 150 },
 };
 
 /**
@@ -357,4 +370,36 @@ export function formatCompactNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return n.toString();
+}
+
+// ------------------------------------------------------------------ //
+//  Page-world bridge                                                  //
+// ------------------------------------------------------------------ //
+
+/**
+ * postMessage channel between the isolated content script (extension APIs)
+ * and the MAIN-world defense script. Page scripts can see this channel;
+ * it is not a security boundary. Prototype patches are visible to the page
+ * regardless.
+ */
+export const PAGE_BRIDGE_CHANNEL = "vitiate-bridge-v3";
+
+/** Config pushed into the page world. Applied live; defenses start default-on. */
+export interface PageWorldConfig {
+  enabled: boolean;
+  intensity: IntensityLevel;
+  policy: ModulePolicy;
+  tokenRefillRate?: number;
+  tokenBucketMax?: number;
+  customSanitizationRules: string[];
+}
+
+/** Batched local report from the page world. No event payloads or PII. */
+export interface PageWorldReport {
+  intercepted: number;
+  synthetic: number;
+  sanitized: number;
+  activity: ActivityEntry[];
+  counters: Partial<Record<ModuleId, Pick<ModuleCounter, "processed" | "errors" | "skippedRateLimit">>>;
+  incidents: { module: ModuleId; message: string }[];
 }

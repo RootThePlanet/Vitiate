@@ -1,4 +1,5 @@
-import { R as RISK_TIER_PRESETS, e as extensionApi, I as INTENSITY_CONFIGS, h as formatCompactNumber } from './chunks/extension-api-C9YccUW9.js';
+import { R as RISK_TIER_PRESETS, I as INTENSITY_CONFIGS, f as formatCompactNumber } from './chunks/types-BBcl8G1i.js';
+import { e as extensionApi } from './chunks/extension-api-B9xipfN0.js';
 
 true              &&(function polyfill() {
   const relList = document.createElement("link").relList;
@@ -15482,6 +15483,8 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 async function init() {
+  const versionEl = document.getElementById("ext-version");
+  if (versionEl) versionEl.textContent = `v${extensionApi.runtime.getManifest().version}`;
   await loadCurrentDomain();
   await loadSettings();
   await Promise.all([loadMetrics(), loadHealth()]);

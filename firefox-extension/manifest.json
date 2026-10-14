@@ -1,23 +1,41 @@
 {
   "manifest_version": 3,
   "name": "Vitiate",
-  "version": "1.2.0",
-  "description": "Advanced privacy extension that poisons behavioral data to defend against autonomous AI scraping and biometric profiling.",
+  "version": "1.3.0",
+  "description": "Raises the cost of behavioral profiling with local event noise, fingerprint readback noise, and tracker redaction.",
   "homepage_url": "https://github.com/RootThePlanet/Vitiate",
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess"
   ],
   "host_permissions": ["<all_urls>"],
+  "declarative_net_request": {
+    "rule_resources": [{
+      "id": "ruleset_1",
+      "enabled": true,
+      "path": "rules.json"
+    }]
+  },
   "background": {
     "scripts": ["background.js"]
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
+      "js": ["page-world.js"],
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_about_blank": true,
+      "world": "MAIN"
+    },
+    {
+      "matches": ["<all_urls>"],
       "js": ["content.js"],
       "run_at": "document_start",
-      "all_frames": true
+      "all_frames": true,
+      "match_about_blank": true
     }
   ],
   "action": {
@@ -48,7 +66,7 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "vitiate@roottheplanet.com",
-      "strict_min_version": "109.0"
+      "strict_min_version": "128.0"
     }
   }
 }

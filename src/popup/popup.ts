@@ -748,6 +748,8 @@ function escapeHtml(str: string): string {
 /* ================================================================== */
 
 async function init(): Promise<void> {
+  const versionEl = document.getElementById("ext-version");
+  if (versionEl) versionEl.textContent = `v${extensionApi.runtime.getManifest().version}`;
   await loadCurrentDomain();
   await loadSettings();
   await Promise.all([loadMetrics(), loadHealth()]);

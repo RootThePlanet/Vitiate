@@ -12,8 +12,11 @@
  * 8. Deduplicate and store site-compatibility incident log          [v2]
  * 9. Compute health status from aggregated counters                [v2]
  * 10. Produce exportable local diagnostics snapshot                [v2]
+ * 11. Strip high-entropy client hints while fingerprinting is on  [2026]
  *
- * Zero network I/O — all processing is local.
+ * Zero network I/O — defenses are injected by the manifest, not this worker.
+ * Tracker blocking is static declarativeNetRequest; this worker only toggles
+ * the client-hint header rule.
  */
 
 import {
@@ -83,6 +86,77 @@ async function saveSettings(settings: VitiateSettings): Promise<void> {
     await extensionApi.storage.local.set({ vitiate_settings: settings });
   } catch (error) {
     console.error("Failed to save settings to storage:", error);
+  }
+  await syncClientHintRule();
+}
+
+/**
+ * High-entropy UA client hints are a primary 2026 fingerprint, and they are
+ * sent as request headers the page cannot see us strip. Keep this aligned
+ * with the page-world getHighEntropyValues reduction: low-entropy brands /
+ * mobile / platform stay, everything else is removed.
+ * Follows the global fingerprint toggle. Per-domain opt-outs are excluded
+ * by initiator domain. Static tracker blocks in rules.json stay always-on.
+ */
+const CLIENT_HINT_RULE_ID = 1001;
+const CLIENT_HINT_HEADERS = [
+  "sec-ch-ua-arch",
+  "sec-ch-ua-bitness",
+  "sec-ch-ua-full-version",
+  "sec-ch-ua-full-version-list",
+  "sec-ch-ua-model",
+  "sec-ch-ua-platform-version",
+  "sec-ch-ua-wow64",
+  "sec-ch-ua-form-factors",
+];
+
+async function syncClientHintRule(): Promise<void> {
+  const dnr = extensionApi.declarativeNetRequest;
+  if (!dnr?.updateDynamicRules) return;
+  try {
+    const settings = await loadSettings();
+    const enabled = settings.enabled && settings.modulePolicy.fingerprint;
+    const excluded = new Set<string>();
+    for (const [domain, on] of Object.entries(settings.domainOverrides)) {
+      if (!on) excluded.add(domain);
+    }
+    for (const [domain, policy] of Object.entries(settings.domainModulePolicy)) {
+      if (policy.fingerprint === false) excluded.add(domain);
+    }
+    const excludedInitiatorDomains = [...excluded].filter(Boolean).slice(0, 50);
+    const addRules: chrome.declarativeNetRequest.Rule[] = enabled
+      ? [{
+          id: CLIENT_HINT_RULE_ID,
+          priority: 1,
+          action: {
+            type: "modifyHeaders",
+            requestHeaders: CLIENT_HINT_HEADERS.map((header) => ({
+              header,
+              operation: "remove" as chrome.declarativeNetRequest.HeaderOperation,
+            })),
+          },
+          condition: {
+            urlFilter: "*",
+            resourceTypes: [
+              "main_frame",
+              "sub_frame",
+              "xmlhttprequest",
+              "script",
+              "image",
+              "font",
+              "stylesheet",
+              "media",
+              "ping",
+              "websocket",
+              "other",
+            ],
+            ...(excludedInitiatorDomains.length > 0 ? { excludedInitiatorDomains } : {}),
+          },
+        }]
+      : [];
+    await dnr.updateDynamicRules({ removeRuleIds: [CLIENT_HINT_RULE_ID], addRules });
+  } catch (error) {
+    console.error("Failed to sync client-hint rule:", error);
   }
 }
 
@@ -363,22 +437,6 @@ extensionApi.runtime.onInstalled.addListener(async () => {
   await updateBadge();
 });
 
-extensionApi.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (changeInfo.status === "loading" && tab.url) {
-    try {
-      const url = new URL(tab.url);
-      if (url.protocol !== "http:" && url.protocol !== "https:") return;
-
-      const settings = await loadSettings();
-      if (isDomainEnabled(settings, url.hostname)) {
-        await extensionApi.scripting.executeScript({
-          target: { tabId, allFrames: true },
-          files: ["content.js"],
-          injectImmediately: true,
-        });
-      }
-    } catch (e) {
-      console.error("Failed to inject content script", e);
-    }
-  }
+extensionApi.runtime.onStartup.addListener(() => {
+  void syncClientHintRule();
 });

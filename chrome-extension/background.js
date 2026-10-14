@@ -1,4 +1,5 @@
-import { e as extensionApi, S as SCHEMA_VERSION, d as defaultMetrics, a as defaultModuleCounter, i as isDomainEnabled, g as getPolicyReason, b as getEffectiveModulePolicy, m as migrateSettings, c as defaultSettings, f as defaultLifetimeMetrics, h as formatCompactNumber } from './chunks/extension-api-C9YccUW9.js';
+import { S as SCHEMA_VERSION, d as defaultMetrics, a as defaultModuleCounter, i as isDomainEnabled, g as getPolicyReason, b as getEffectiveModulePolicy, m as migrateSettings, c as defaultSettings, e as defaultLifetimeMetrics, f as formatCompactNumber } from './chunks/types-BBcl8G1i.js';
+import { e as extensionApi } from './chunks/extension-api-B9xipfN0.js';
 
 let sessionMetrics = defaultMetrics();
 const MAX_FEED = 50;
@@ -27,6 +28,65 @@ async function saveSettings(settings) {
     await extensionApi.storage.local.set({ vitiate_settings: settings });
   } catch (error) {
     console.error("Failed to save settings to storage:", error);
+  }
+  await syncClientHintRule();
+}
+const CLIENT_HINT_RULE_ID = 1001;
+const CLIENT_HINT_HEADERS = [
+  "sec-ch-ua-arch",
+  "sec-ch-ua-bitness",
+  "sec-ch-ua-full-version",
+  "sec-ch-ua-full-version-list",
+  "sec-ch-ua-model",
+  "sec-ch-ua-platform-version",
+  "sec-ch-ua-wow64",
+  "sec-ch-ua-form-factors"
+];
+async function syncClientHintRule() {
+  const dnr = extensionApi.declarativeNetRequest;
+  if (!dnr?.updateDynamicRules) return;
+  try {
+    const settings = await loadSettings();
+    const enabled = settings.enabled && settings.modulePolicy.fingerprint;
+    const excluded = /* @__PURE__ */ new Set();
+    for (const [domain, on] of Object.entries(settings.domainOverrides)) {
+      if (!on) excluded.add(domain);
+    }
+    for (const [domain, policy] of Object.entries(settings.domainModulePolicy)) {
+      if (policy.fingerprint === false) excluded.add(domain);
+    }
+    const excludedInitiatorDomains = [...excluded].filter(Boolean).slice(0, 50);
+    const addRules = enabled ? [{
+      id: CLIENT_HINT_RULE_ID,
+      priority: 1,
+      action: {
+        type: "modifyHeaders",
+        requestHeaders: CLIENT_HINT_HEADERS.map((header) => ({
+          header,
+          operation: "remove"
+        }))
+      },
+      condition: {
+        urlFilter: "*",
+        resourceTypes: [
+          "main_frame",
+          "sub_frame",
+          "xmlhttprequest",
+          "script",
+          "image",
+          "font",
+          "stylesheet",
+          "media",
+          "ping",
+          "websocket",
+          "other"
+        ],
+        ...excludedInitiatorDomains.length > 0 ? { excludedInitiatorDomains } : {}
+      }
+    }] : [];
+    await dnr.updateDynamicRules({ removeRuleIds: [CLIENT_HINT_RULE_ID], addRules });
+  } catch (error) {
+    console.error("Failed to sync client-hint rule:", error);
   }
 }
 async function loadLifetimeMetrics() {
@@ -243,21 +303,6 @@ extensionApi.runtime.onInstalled.addListener(async () => {
   }
   await updateBadge();
 });
-extensionApi.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (changeInfo.status === "loading" && tab.url) {
-    try {
-      const url = new URL(tab.url);
-      if (url.protocol !== "http:" && url.protocol !== "https:") return;
-      const settings = await loadSettings();
-      if (isDomainEnabled(settings, url.hostname)) {
-        await extensionApi.scripting.executeScript({
-          target: { tabId, allFrames: true },
-          files: ["content.js"],
-          injectImmediately: true
-        });
-      }
-    } catch (e) {
-      console.error("Failed to inject content script", e);
-    }
-  }
+extensionApi.runtime.onStartup.addListener(() => {
+  void syncClientHintRule();
 });
